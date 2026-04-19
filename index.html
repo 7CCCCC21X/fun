@@ -260,6 +260,52 @@
       font-size: 12px;
     }
 
+    th.num, td.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    td.num { color: #e9eefc; }
+
+    table th:first-child,
+    table td:first-child {
+      position: sticky;
+      left: 0;
+      background: #0c1530;
+      z-index: 1;
+      box-shadow: 6px 0 12px -10px rgba(0,0,0,.6);
+    }
+
+    thead th:first-child { z-index: 3; background: #111936; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      line-height: 1.6;
+    }
+
+    .badge.ok {
+      background: rgba(102, 211, 158, .14);
+      color: var(--ok);
+      border: 1px solid rgba(102, 211, 158, .3);
+    }
+
+    .badge.bad {
+      background: rgba(255, 123, 123, .14);
+      color: var(--bad);
+      border: 1px solid rgba(255, 123, 123, .3);
+    }
+
+    .badge.warn {
+      background: rgba(255, 209, 102, .14);
+      color: var(--warn);
+      border: 1px solid rgba(255, 209, 102, .3);
+    }
+
     td.wallet {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
@@ -518,43 +564,70 @@
     }
 
     const detailColumns = [
-      ["wallet", "钱包"],
-      ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "总积分"],
-      ["allocation_round_points", "本轮积分"],
-      ["week", "周"],
-      ["calculated", "已结算"],
-      ["week_start_utc8", "开始时间 UTC+8"],
-      ["week_end_utc8", "结束时间 UTC+8"],
-      ["trade_count", "交易次数"],
-      ["paid_volume_usdt", "付费交易量"],
-      ["free_volume_usdt", "免费交易量"],
-      ["total_volume_usdt", "总交易量"],
-      ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "周积分"],
-      ["referral_points", "推荐积分"],
-      ["error", "错误"]
+      ["wallet", "钱包", "wallet"],
+      ["status", "状态", "status"],
+      ["rank", "排名", "int"],
+      ["total_points", "总积分", "amount2"],
+      ["allocation_round_points", "本轮积分", "amount2"],
+      ["week", "周", "int"],
+      ["calculated", "已结算", "bool"],
+      ["week_start_utc8", "开始时间 UTC+8", "text"],
+      ["week_end_utc8", "结束时间 UTC+8", "text"],
+      ["trade_count", "交易次数", "int"],
+      ["paid_volume_usdt", "付费交易量", "amount2"],
+      ["free_volume_usdt", "免费交易量", "amount2"],
+      ["total_volume_usdt", "总交易量", "amount2"],
+      ["paid_fee_usdt", "手续费", "amount2"],
+      ["cost_usdt", "成本", "amount2"],
+      ["points", "周积分", "amount2"],
+      ["referral_points", "推荐积分", "amount2"],
+      ["error", "错误", "text"]
     ];
 
     const summaryColumns = [
-      ["wallet", "钱包"],
-      ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "当前总积分"],
-      ["selected_weeks", "统计周数"],
-      ["calculated_all", "全部已结算"],
-      ["trade_count", "交易次数"],
-      ["paid_volume_usdt", "付费交易量"],
-      ["free_volume_usdt", "免费交易量"],
-      ["total_volume_usdt", "总交易量"],
-      ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "统计周积分"],
-      ["referral_points", "推荐积分"],
-      ["error", "错误"]
+      ["wallet", "钱包", "wallet"],
+      ["status", "状态", "status"],
+      ["rank", "排名", "int"],
+      ["total_points", "当前总积分", "amount2"],
+      ["selected_weeks", "统计周数", "text"],
+      ["calculated_all", "全部已结算", "bool"],
+      ["trade_count", "交易次数", "int"],
+      ["paid_volume_usdt", "付费交易量", "amount2"],
+      ["free_volume_usdt", "免费交易量", "amount2"],
+      ["total_volume_usdt", "总交易量", "amount2"],
+      ["paid_fee_usdt", "手续费", "amount2"],
+      ["cost_usdt", "成本", "amount2"],
+      ["points", "统计周积分", "amount2"],
+      ["referral_points", "推荐积分", "amount2"],
+      ["error", "错误", "text"]
     ];
+
+    const NUMERIC_TYPES = new Set(["int", "amount2", "amount4"]);
+
+    function formatAmount(value, decimals) {
+      const normalized = normalizeDecimal(value);
+      const n = Number(normalized);
+      if (!Number.isFinite(n)) return normalized;
+      return n.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+    }
+
+    function formatInt(value) {
+      const normalized = normalizeDecimal(value);
+      const n = Number(normalized);
+      if (!Number.isFinite(n)) return normalized;
+      return Math.round(n).toLocaleString("en-US");
+    }
+
+    function formatByType(type, value) {
+      if (value === "" || value === null || value === undefined) return "";
+      if (type === "int") return formatInt(value);
+      if (type === "amount2") return formatAmount(value, 2);
+      if (type === "amount4") return formatAmount(value, 4);
+      return String(value);
+    }
 
     function log(message) {
       const el = $("log");
@@ -944,12 +1017,12 @@
       const calculated = okRows.filter(r => r.calculated === "true").length;
       const uncalculated = okRows.filter(r => r.calculated === "false").length;
 
-      $("statVolume").textContent = shortDecimal(totalVolume, 4);
-      $("statCost").textContent = shortDecimal(totalCost, 8);
-      $("statTrades").textContent = totalTrades;
-      $("statPoints").textContent = shortDecimal(totalPoints, 6);
-      $("statCalculated").textContent = String(calculated);
-      $("statUncalculated").textContent = String(uncalculated);
+      $("statVolume").textContent = formatAmount(totalVolume, 2);
+      $("statCost").textContent = formatAmount(totalCost, 2);
+      $("statTrades").textContent = formatInt(totalTrades);
+      $("statPoints").textContent = formatAmount(totalPoints, 2);
+      $("statCalculated").textContent = formatInt(calculated);
+      $("statUncalculated").textContent = formatInt(uncalculated);
 
       const pct = state.totalWallets ? Math.round(state.completedWallets / state.totalWallets * 100) : 0;
       $("progressBar").style.width = `${pct}%`;
@@ -960,18 +1033,16 @@
       $("copySummaryBtn").disabled = !hasRows;
     }
 
-    function cellClass(key, value) {
-      if (key === "status") {
-        if (value === "ok") return "ok";
-        if (value === "error") return "badText";
-        return "warnText";
-      }
-      if (key === "calculated" || key === "calculated_all") {
-        if (value === "true") return "ok";
-        if (value === "false") return "warnText";
-      }
-      if (key === "wallet") return "wallet";
+    function cellClass(type, key) {
+      if (type === "wallet") return "wallet";
+      if (NUMERIC_TYPES.has(type)) return "num";
       return "";
+    }
+
+    function badgeClassForStatus(value) {
+      if (value === "ok") return "ok";
+      if (value === "error") return "bad";
+      return "warn";
     }
 
     function filterRows(rows) {
@@ -1007,8 +1078,12 @@
       });
     }
 
-    function renderCellValue(td, key, value) {
-      if (key === "wallet" && value) {
+    function renderCellValue(td, type, key, value) {
+      if (type === "wallet") {
+        if (!value) {
+          td.textContent = "";
+          return;
+        }
         td.innerHTML = "";
         td.title = value;
         const wrap = document.createElement("span");
@@ -1031,8 +1106,40 @@
         td.appendChild(wrap);
         return;
       }
+
+      if (type === "status") {
+        if (!value) { td.textContent = ""; return; }
+        const badge = document.createElement("span");
+        badge.className = `badge ${badgeClassForStatus(value)}`;
+        badge.textContent = value;
+        td.title = value;
+        td.appendChild(badge);
+        return;
+      }
+
+      if (type === "bool") {
+        if (value === "" || value === null || value === undefined) {
+          td.textContent = "";
+          return;
+        }
+        const isTrue = String(value).toLowerCase() === "true";
+        const badge = document.createElement("span");
+        badge.className = `badge ${isTrue ? "ok" : "warn"}`;
+        badge.textContent = isTrue ? "是" : "否";
+        td.title = String(value);
+        td.appendChild(badge);
+        return;
+      }
+
+      if (NUMERIC_TYPES.has(type)) {
+        const formatted = formatByType(type, value);
+        td.textContent = formatted;
+        td.title = String(value);
+        return;
+      }
+
       td.textContent = value;
-      td.title = value;
+      if (value !== "" && value !== null && value !== undefined) td.title = String(value);
     }
 
     function renderTable(containerId, rows, columns, tableKey) {
@@ -1054,9 +1161,10 @@
       const trh = document.createElement("tr");
       const sortState = state.sort[tableKey];
 
-      for (const [key, label] of columns) {
+      for (const [key, label, type] of columns) {
         const th = document.createElement("th");
         th.className = "sortable";
+        if (NUMERIC_TYPES.has(type)) th.classList.add("num");
         if (sortState.key === key) th.classList.add("activeSort");
         const labelSpan = document.createElement("span");
         labelSpan.textContent = label;
@@ -1082,11 +1190,11 @@
       const tbody = document.createElement("tbody");
       for (const row of sorted) {
         const tr = document.createElement("tr");
-        for (const [key] of columns) {
+        for (const [key, , type] of columns) {
           const td = document.createElement("td");
           const value = row[key] ?? "";
-          renderCellValue(td, key, value);
-          const cls = cellClass(key, value);
+          renderCellValue(td, type, key, value);
+          const cls = cellClass(type, key);
           if (cls) td.className = td.className ? `${td.className} ${cls}` : cls;
           tr.appendChild(td);
         }
