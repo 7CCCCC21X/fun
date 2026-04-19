@@ -403,6 +403,111 @@
     }
 
     details.advanced .row-grid input { width: 100%; }
+
+    .hot {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    .muted-suffix {
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: 2px;
+    }
+
+    .best-panel {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 10px 0 4px;
+      padding: 10px 14px;
+      background: linear-gradient(90deg, rgba(20,122,61,.10), rgba(20,122,61,0));
+      border: 1px solid rgba(20,122,61,.28);
+      border-left: 3px solid var(--ok);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .best-panel .best-tag {
+      background: var(--ok);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    .best-panel .best-addr {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: rgba(255,255,255,.6);
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .best-panel .best-stat { color: var(--text); }
+    .best-panel .best-stat b { font-variant-numeric: tabular-nums; }
+
+    td.eff {
+      font-variant-numeric: tabular-nums;
+      min-width: 150px;
+    }
+
+    td.eff .effInner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    td.eff .effVal {
+      min-width: 56px;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    td.eff .effBar {
+      flex: 1;
+      height: 6px;
+      background: var(--line);
+      border-radius: 3px;
+      overflow: hidden;
+      max-width: 80px;
+    }
+
+    td.eff .effFill {
+      height: 100%;
+      background: linear-gradient(90deg, #4ca96b, #147a3d);
+      border-radius: 3px;
+      transition: width .25s ease;
+    }
+
+    td.eff.zero .effVal { color: var(--muted); font-weight: 500; }
+    td.eff.zero .effFill { background: var(--line-strong); }
+
+    td.eff.inf .effVal { color: var(--accent); }
+    td.eff.inf .effFill { background: var(--accent); width: 100% !important; }
+
+    tr.best-row { background: linear-gradient(90deg, rgba(20,122,61,.09), rgba(20,122,61,0) 65%); }
+    tr.best-row:hover { background: linear-gradient(90deg, rgba(20,122,61,.14), rgba(20,122,61,0) 65%); }
+
+    tr.best-row td.wallet a.walletLink::after {
+      content: "最佳";
+      display: inline-block;
+      background: var(--ok);
+      color: #fff;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 8px;
+      vertical-align: middle;
+      text-decoration: none;
+      letter-spacing: .3px;
+    }
   </style>
 </head>
 <body>
@@ -430,13 +535,24 @@
       <span class="sep">|</span>
       <span class="label">汇总积分 Σ:</span><span id="statPoints">0</span>
       <span class="sep">|</span>
-      <span class="label">汇总交易量</span><span id="statVolume">0</span>
+      <span class="label">汇总成本</span><span id="statCost">0 U</span>
       <span class="sep">|</span>
-      <span class="label">汇总成本</span><span id="statCost">0</span>
+      <span class="label">整体性价比</span><span id="statOverallEff" class="hot">0</span><span class="muted-suffix"> 积分/U</span>
+      <span class="sep">|</span>
+      <span class="label">汇总交易量</span><span id="statVolume">0</span>
       <span class="sep">|</span>
       <span class="label">交易次数</span><span id="statTrades">0</span>
       <span class="sep">|</span>
       <span class="label">已结算 / 未结算</span><span id="statCalcSplit">0 / 0</span>
+    </div>
+
+    <div id="bestPanel" class="best-panel" hidden>
+      <span class="best-tag">最划算钱包</span>
+      <code id="bestAddr" class="best-addr">-</code>
+      <button id="bestCopyBtn" class="copyBtn" type="button">复制</button>
+      <span class="best-stat"><span class="muted">积分</span> <b id="bestPoints">0</b></span>
+      <span class="best-stat"><span class="muted">成本</span> <b id="bestCost">0</b> U</span>
+      <span class="best-stat"><span class="muted">性价比</span> <b id="bestEff" class="hot">0</b> <span class="muted">积分/U</span></span>
     </div>
 
     <div class="progressOuter"><div id="progressBar" class="progressInner"></div></div>
@@ -516,9 +632,10 @@
       filterText: "",
       onlyCalculated: false,
       sort: {
-        summary: { key: null, dir: "asc" },
-        detail: { key: null, dir: "asc" },
+        summary: { key: "efficiency", dir: "desc" },
+        detail: { key: "efficiency", dir: "desc" },
       },
+      bestWallet: null,
     };
 
     const numericKeys = new Set([
@@ -526,7 +643,26 @@
       "week", "trade_count",
       "paid_volume_usdt", "free_volume_usdt", "total_volume_usdt",
       "paid_fee_usdt", "cost_usdt", "points", "referral_points",
+      "efficiency",
     ]);
+
+    function computeEfficiency(pointsStr, costStr) {
+      const p = Number(pointsStr || "0");
+      const c = Number(costStr || "0");
+      if (!isFinite(p) || !isFinite(c) || p < 0) return "0";
+      if (c === 0) return p > 0 ? "Infinity" : "0";
+      return String(p / c);
+    }
+
+    function formatEfficiency(s) {
+      if (s === "Infinity") return "免费";
+      const n = Number(s);
+      if (!isFinite(n) || n <= 0) return "0";
+      if (n >= 1000) return n.toFixed(0);
+      if (n >= 100) return n.toFixed(1);
+      if (n >= 1) return n.toFixed(2);
+      return n.toFixed(4);
+    }
 
     function shortWallet(addr) {
       if (!addr || addr.length < 12) return addr || "";
@@ -536,20 +672,21 @@
     const detailColumns = [
       ["wallet", "钱包"],
       ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "总积分"],
-      ["allocation_round_points", "本轮积分"],
       ["week", "周"],
       ["calculated", "已结算"],
-      ["week_start_utc8", "开始时间 UTC+8"],
-      ["week_end_utc8", "结束时间 UTC+8"],
+      ["points", "周积分"],
+      ["cost_usdt", "成本 U"],
+      ["efficiency", "性价比 积分/U"],
       ["trade_count", "交易次数"],
       ["paid_volume_usdt", "付费交易量"],
       ["free_volume_usdt", "免费交易量"],
       ["total_volume_usdt", "总交易量"],
       ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "周积分"],
+      ["rank", "排名"],
+      ["total_points", "总积分"],
+      ["allocation_round_points", "本轮积分"],
+      ["week_start_utc8", "开始时间 UTC+8"],
+      ["week_end_utc8", "结束时间 UTC+8"],
       ["referral_points", "推荐积分"],
       ["error", "错误"]
     ];
@@ -557,17 +694,18 @@
     const summaryColumns = [
       ["wallet", "钱包"],
       ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "当前总积分"],
+      ["points", "统计周积分"],
+      ["cost_usdt", "成本 U"],
+      ["efficiency", "性价比 积分/U"],
       ["selected_weeks", "统计周数"],
       ["calculated_all", "全部已结算"],
       ["trade_count", "交易次数"],
+      ["total_volume_usdt", "总交易量"],
       ["paid_volume_usdt", "付费交易量"],
       ["free_volume_usdt", "免费交易量"],
-      ["total_volume_usdt", "总交易量"],
       ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "统计周积分"],
+      ["rank", "排名"],
+      ["total_points", "当前总积分"],
       ["referral_points", "推荐积分"],
       ["error", "错误"]
     ];
@@ -823,6 +961,7 @@
             paid_fee_usdt: "0",
             cost_usdt: "0",
             points: "0",
+            efficiency: "0",
             referral_points: "0",
             error: "接口没有返回这一周"
           });
@@ -855,6 +994,7 @@
           paid_fee_usdt: paidFee,
           cost_usdt: paidFee,
           points,
+          efficiency: computeEfficiency(points, paidFee),
           referral_points: referralPoints,
           error: ""
         });
@@ -881,6 +1021,7 @@
         paid_fee_usdt: "0",
         cost_usdt: "0",
         points: "0",
+        efficiency: "0",
         referral_points: "0",
         error
       };
@@ -944,7 +1085,8 @@
 
       return [...map.values()].map(row => ({
         ...row,
-        selected_weeks: row.selected_weeks.join(",")
+        selected_weeks: row.selected_weeks.join(","),
+        efficiency: computeEfficiency(row.points, row.cost_usdt)
       }));
     }
 
@@ -961,10 +1103,26 @@
       const uncalculated = okRows.filter(r => r.calculated === "false").length;
 
       $("statVolume").textContent = shortDecimal(totalVolume, 4);
-      $("statCost").textContent = shortDecimal(totalCost, 8);
+      $("statCost").textContent = shortDecimal(totalCost, 6) + " U";
       $("statTrades").textContent = totalTrades;
       $("statPoints").textContent = shortDecimal(totalPoints, 6);
       $("statCalcSplit").textContent = `${calculated} / ${uncalculated}`;
+
+      const overallEff = computeEfficiency(totalPoints, totalCost);
+      $("statOverallEff").textContent = formatEfficiency(overallEff);
+
+      const best = findBestWallet(state.summaryRows);
+      state.bestWallet = best ? best.wallet : null;
+      const panel = $("bestPanel");
+      if (best) {
+        panel.hidden = false;
+        $("bestAddr").textContent = best.wallet;
+        $("bestPoints").textContent = shortDecimal(best.points, 4);
+        $("bestCost").textContent = shortDecimal(best.cost_usdt, 6);
+        $("bestEff").textContent = formatEfficiency(best.efficiency);
+      } else {
+        panel.hidden = true;
+      }
 
       const pct = state.totalWallets ? Math.round(state.completedWallets / state.totalWallets * 100) : 0;
       $("progressBar").style.width = `${pct}%`;
@@ -986,6 +1144,12 @@
         if (value === "false") return "warnText";
       }
       if (key === "wallet") return "wallet";
+      if (key === "efficiency") {
+        if (value === "Infinity") return "eff inf";
+        const n = Number(value);
+        if (!isFinite(n) || n <= 0) return "eff zero";
+        return "eff";
+      }
       return "";
     }
 
@@ -1030,7 +1194,34 @@
       });
     }
 
-    function renderCellValue(td, key, value) {
+    function renderCellValue(td, key, value, ctx) {
+      if (key === "efficiency") {
+        td.innerHTML = "";
+        const wrap = document.createElement("span");
+        wrap.className = "effInner";
+        const bar = document.createElement("span");
+        bar.className = "effBar";
+        const fill = document.createElement("span");
+        fill.className = "effFill";
+        const num = document.createElement("span");
+        num.className = "effVal";
+        num.textContent = formatEfficiency(value);
+
+        const isInf = value === "Infinity";
+        const n = isInf ? 0 : Number(value);
+        const max = ctx && ctx.maxEff ? ctx.maxEff : 0;
+        let pct = 0;
+        if (isInf) pct = 100;
+        else if (max === Infinity) pct = 0;
+        else if (max > 0 && isFinite(n) && n > 0) pct = Math.min(100, (n / max) * 100);
+        fill.style.width = pct + "%";
+
+        bar.appendChild(fill);
+        wrap.append(num, bar);
+        td.appendChild(wrap);
+        td.title = isInf ? "成本为 0，相当于免费拿到积分" : `${formatEfficiency(value)} 积分 / 1 USDT 成本`;
+        return;
+      }
       if (key === "wallet" && value) {
         td.innerHTML = "";
         td.title = value;
@@ -1065,6 +1256,26 @@
       td.title = value;
     }
 
+    function effSortValue(v) {
+      if (v === "Infinity") return Infinity;
+      const n = Number(v);
+      return isFinite(n) ? n : 0;
+    }
+
+    function findBestWallet(summaryRows) {
+      let best = null;
+      let bestVal = -1;
+      for (const row of summaryRows) {
+        if (row.status !== "ok") continue;
+        const v = effSortValue(row.efficiency);
+        if (v > bestVal) {
+          bestVal = v;
+          best = row;
+        }
+      }
+      return best && bestVal > 0 ? best : null;
+    }
+
     function renderTable(containerId, rows, columns, tableKey) {
       const box = $(containerId);
       const filtered = filterRows(rows, tableKey);
@@ -1078,6 +1289,15 @@
         box.innerHTML = `<div style="padding:18px;color:var(--muted)">${rows.length ? "没有匹配的行" : "暂无数据"}</div>`;
         return;
       }
+
+      let maxEff = 0;
+      for (const r of sorted) {
+        const v = effSortValue(r.efficiency);
+        if (v === Infinity) continue;
+        if (v > maxEff) maxEff = v;
+      }
+      const ctx = { maxEff };
+      const bestWallet = state.bestWallet;
 
       const table = document.createElement("table");
       const thead = document.createElement("thead");
@@ -1116,13 +1336,16 @@
       const tbody = document.createElement("tbody");
       sorted.forEach((row, idx) => {
         const tr = document.createElement("tr");
+        if (tableKey === "summary" && bestWallet && row.wallet === bestWallet) {
+          tr.classList.add("best-row");
+        }
         const indexTd = document.createElement("td");
         indexTd.textContent = String(idx + 1);
         tr.appendChild(indexTd);
         for (const [key] of columns) {
           const td = document.createElement("td");
           const value = row[key] ?? "";
-          renderCellValue(td, key, value);
+          renderCellValue(td, key, value, ctx);
           const cls = cellClass(key, value);
           if (cls) td.className = td.className ? `${td.className} ${cls}` : cls;
           tr.appendChild(td);
@@ -1137,6 +1360,8 @@
 
     function renderAll() {
       state.summaryRows = buildSummaryRows(state.detailRows);
+      const best = findBestWallet(state.summaryRows);
+      state.bestWallet = best ? best.wallet : null;
       renderTable("summaryBox", state.summaryRows, summaryColumns, "summary");
       renderTable("detailBox", state.detailRows, detailColumns, "detail");
       updateStats();
@@ -1295,6 +1520,18 @@
     $("onlyCalculated").addEventListener("change", (e) => {
       state.onlyCalculated = e.target.checked;
       renderAll();
+    });
+
+    $("bestCopyBtn").addEventListener("click", async () => {
+      const addr = $("bestAddr").textContent || "";
+      if (!addr || addr === "-") return;
+      try {
+        await navigator.clipboard.writeText(addr);
+        const btn = $("bestCopyBtn");
+        const old = btn.textContent;
+        btn.textContent = "已复制";
+        setTimeout(() => { btn.textContent = old; }, 1200);
+      } catch {}
     });
 
     $("startBtn").addEventListener("click", runQuery);
