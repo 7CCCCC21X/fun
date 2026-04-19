@@ -499,6 +499,48 @@
     tr.best-row { background: linear-gradient(90deg, rgba(20,122,61,.09), rgba(20,122,61,0) 65%); }
     tr.best-row:hover { background: linear-gradient(90deg, rgba(20,122,61,.14), rgba(20,122,61,0) 65%); }
 
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 10px 0 8px;
+      padding: 8px 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+    }
+
+    .filter-bar .filter-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    .filter-bar input[type="number"] {
+      width: 110px;
+      padding: 5px 8px;
+    }
+
+    .filter-bar label { font-size: 13px; }
+
+    .filter-bar button {
+      padding: 5px 12px;
+      font-size: 12px;
+    }
+
+    .filter-bar .filter-hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    .filter-bar .filter-hint.active {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     tr.best-row td.wallet a.walletLink::after {
       content: "最佳";
       display: inline-block;
@@ -605,6 +647,21 @@
       <div class="tab" data-tab="detail">周明细</div>
     </div>
 
+    <div class="filter-bar">
+      <span class="filter-label">筛选：</span>
+      <div class="control-group">
+        <label for="minPoints">周积分 ≥</label>
+        <input id="minPoints" type="number" min="0" step="any" placeholder="0" />
+      </div>
+      <div class="control-group">
+        <label for="minVolume">总交易量 ≥</label>
+        <input id="minVolume" type="number" min="0" step="any" placeholder="0" />
+      </div>
+      <label class="checkbox"><input id="onlyZeroReferral" type="checkbox" />只显示推荐积分=0</label>
+      <button id="resetFiltersBtn" class="secondary">重置筛选</button>
+      <span class="filter-hint" id="filterHint"></span>
+    </div>
+
     <div class="tableBar">
       <input id="filterInput" type="search" placeholder="按钱包、状态、错误信息、周数过滤..." />
       <div class="rowCount" id="rowCount">0 行</div>
@@ -636,6 +693,9 @@
       activeTab: "summary",
       filterText: "",
       onlyCalculated: false,
+      minPoints: 0,
+      minVolume: 0,
+      onlyZeroReferral: false,
       sort: {
         summary: { key: "cost_per_point", dir: "asc" },
         detail: { key: "cost_per_point", dir: "asc" },
@@ -1186,6 +1246,24 @@
           result = result.filter(r => String(r.calculated_all).toLowerCase() === "true");
         }
       }
+      if (state.minPoints > 0) {
+        result = result.filter(r => {
+          const n = Number(r.points);
+          return isFinite(n) && n >= state.minPoints;
+        });
+      }
+      if (state.minVolume > 0) {
+        result = result.filter(r => {
+          const n = Number(r.total_volume_usdt);
+          return isFinite(n) && n >= state.minVolume;
+        });
+      }
+      if (state.onlyZeroReferral) {
+        result = result.filter(r => {
+          const n = Number(r.referral_points);
+          return isFinite(n) && n === 0;
+        });
+      }
       const q = state.filterText.trim().toLowerCase();
       if (!q) return result;
       return result.filter(row => {
@@ -1196,6 +1274,22 @@
         }
         return false;
       });
+    }
+
+    function updateFilterHint() {
+      const parts = [];
+      if (state.minPoints > 0) parts.push(`周积分≥${state.minPoints}`);
+      if (state.minVolume > 0) parts.push(`总交易量≥${state.minVolume}`);
+      if (state.onlyZeroReferral) parts.push("推荐积分=0");
+      if (state.onlyCalculated) parts.push("已结算");
+      const hint = $("filterHint");
+      if (parts.length) {
+        hint.textContent = `启用中: ${parts.join(" / ")}`;
+        hint.classList.add("active");
+      } else {
+        hint.textContent = "";
+        hint.classList.remove("active");
+      }
     }
 
     function sortRows(rows, sortState) {
@@ -1415,6 +1509,7 @@
       state.summaryRows = buildSummaryRows(state.detailRows);
       const best = findBestWallet(state.summaryRows);
       state.bestWallet = best ? best.wallet : null;
+      updateFilterHint();
       renderTable("summaryBox", state.summaryRows, summaryColumns, "summary");
       renderTable("detailBox", state.detailRows, detailColumns, "detail");
       updateStats();
@@ -1572,6 +1667,38 @@
 
     $("onlyCalculated").addEventListener("change", (e) => {
       state.onlyCalculated = e.target.checked;
+      renderAll();
+    });
+
+    function readMinInput(el) {
+      const raw = (el.value || "").trim();
+      if (!raw) return 0;
+      const n = Number(raw);
+      return isFinite(n) && n > 0 ? n : 0;
+    }
+
+    $("minPoints").addEventListener("input", (e) => {
+      state.minPoints = readMinInput(e.target);
+      renderAll();
+    });
+
+    $("minVolume").addEventListener("input", (e) => {
+      state.minVolume = readMinInput(e.target);
+      renderAll();
+    });
+
+    $("onlyZeroReferral").addEventListener("change", (e) => {
+      state.onlyZeroReferral = e.target.checked;
+      renderAll();
+    });
+
+    $("resetFiltersBtn").addEventListener("click", () => {
+      state.minPoints = 0;
+      state.minVolume = 0;
+      state.onlyZeroReferral = false;
+      $("minPoints").value = "";
+      $("minVolume").value = "";
+      $("onlyZeroReferral").checked = false;
       renderAll();
     });
 
