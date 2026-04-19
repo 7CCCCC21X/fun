@@ -436,6 +436,22 @@
       border-bottom: 1px solid var(--line);
     }
 
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: color .12s ease, background .12s ease;
+    }
+    th.sortable:hover { color: var(--accent); background: linear-gradient(180deg, #1a2750, #141f3f); }
+    th.sortable .arrow {
+      display: inline-block;
+      margin-left: 4px;
+      opacity: .35;
+      font-size: 10px;
+      transition: opacity .12s ease, color .12s ease;
+    }
+    th.sorted { color: var(--accent); }
+    th.sorted .arrow { opacity: 1; color: var(--accent); }
+
     tbody tr { transition: background .12s ease; }
     tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
     tbody tr:hover { background: rgba(122,162,255,.07); }
@@ -653,44 +669,48 @@
       aggregates: initAggregates(),
       startedAt: null,
       renderScheduled: false,
+      sort: {
+        summary: { key: null, dir: 0 },
+        detail: { key: null, dir: 0 },
+      },
     };
 
     const detailColumns = [
       ["wallet", "钱包"],
       ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "总积分"],
-      ["allocation_round_points", "本轮积分"],
-      ["week", "周"],
+      ["rank", "排名", "num"],
+      ["total_points", "总积分", "num"],
+      ["allocation_round_points", "本轮积分", "num"],
+      ["week", "周", "num"],
       ["calculated", "已结算"],
       ["week_start_utc8", "开始时间 UTC+8"],
       ["week_end_utc8", "结束时间 UTC+8"],
-      ["trade_count", "交易次数"],
-      ["paid_volume_usdt", "付费交易量"],
-      ["free_volume_usdt", "免费交易量"],
-      ["total_volume_usdt", "总交易量"],
-      ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "周积分"],
-      ["referral_points", "推荐积分"],
+      ["trade_count", "交易次数", "num"],
+      ["paid_volume_usdt", "付费交易量", "num"],
+      ["free_volume_usdt", "免费交易量", "num"],
+      ["total_volume_usdt", "总交易量", "num"],
+      ["paid_fee_usdt", "手续费", "num"],
+      ["cost_usdt", "成本", "num"],
+      ["points", "周积分", "num"],
+      ["referral_points", "推荐积分", "num"],
       ["error", "错误"]
     ];
 
     const summaryColumns = [
       ["wallet", "钱包"],
       ["status", "状态"],
-      ["rank", "排名"],
-      ["total_points", "当前总积分"],
+      ["rank", "排名", "num"],
+      ["total_points", "当前总积分", "num"],
       ["selected_weeks", "统计周数"],
       ["calculated_all", "全部已结算"],
-      ["trade_count", "交易次数"],
-      ["paid_volume_usdt", "付费交易量"],
-      ["free_volume_usdt", "免费交易量"],
-      ["total_volume_usdt", "总交易量"],
-      ["paid_fee_usdt", "手续费"],
-      ["cost_usdt", "成本"],
-      ["points", "统计周积分"],
-      ["referral_points", "推荐积分"],
+      ["trade_count", "交易次数", "num"],
+      ["paid_volume_usdt", "付费交易量", "num"],
+      ["free_volume_usdt", "免费交易量", "num"],
+      ["total_volume_usdt", "总交易量", "num"],
+      ["paid_fee_usdt", "手续费", "num"],
+      ["cost_usdt", "成本", "num"],
+      ["points", "统计周积分", "num"],
+      ["referral_points", "推荐积分", "num"],
       ["error", "错误"]
     ];
 
@@ -1103,28 +1123,89 @@
       return "";
     }
 
-    function renderTable(containerId, rows, columns) {
+    function decimalCompare(a, b) {
+      const A = toScaled(a || "0");
+      const B = toScaled(b || "0");
+      const scale = Math.max(A.scale, B.scale);
+      const na = A.n * pow10(scale - A.scale);
+      const nb = B.n * pow10(scale - B.scale);
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    }
+
+    function sortRows(rows, columns, sortState) {
+      if (!sortState.key || !sortState.dir) return rows;
+      const col = columns.find(c => c[0] === sortState.key);
+      if (!col) return rows;
+      const isNum = col[2] === "num";
+      const key = sortState.key;
+      const dir = sortState.dir;
+
+      const indexed = rows.map((row, i) => ({ row, i }));
+      indexed.sort((x, y) => {
+        const a = x.row[key];
+        const b = y.row[key];
+        const aEmpty = a === "" || a === null || a === undefined;
+        const bEmpty = b === "" || b === null || b === undefined;
+        if (aEmpty && bEmpty) return x.i - y.i;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+        const c = isNum ? decimalCompare(a, b) : String(a).localeCompare(String(b));
+        return c !== 0 ? dir * c : x.i - y.i;
+      });
+      return indexed.map(entry => entry.row);
+    }
+
+    function toggleSort(tableKey, key) {
+      const s = state.sort[tableKey];
+      if (s.key === key) {
+        s.dir = s.dir === 1 ? -1 : s.dir === -1 ? 0 : 1;
+        if (s.dir === 0) s.key = null;
+      } else {
+        s.key = key;
+        s.dir = 1;
+      }
+      renderAll();
+    }
+
+    function renderTable(containerId, rows, columns, tableKey) {
       const box = $(containerId);
       if (!rows.length) {
         box.innerHTML = `<div class="emptyState"><div class="icon">📭</div>暂无数据，填入钱包后点击<b>开始查询</b></div>`;
         return;
       }
 
+      const sortState = state.sort[tableKey];
+      const sortedRows = sortRows(rows, columns, sortState);
+
       const fragment = document.createDocumentFragment();
       const table = document.createElement("table");
       const thead = document.createElement("thead");
       const trh = document.createElement("tr");
 
-      for (const [, label] of columns) {
+      for (const [key, label] of columns) {
         const th = document.createElement("th");
         th.textContent = label;
+        th.classList.add("sortable");
+        th.dataset.key = key;
+
+        const arrow = document.createElement("span");
+        arrow.className = "arrow";
+        if (sortState.key === key && sortState.dir !== 0) {
+          th.classList.add("sorted");
+          arrow.textContent = sortState.dir === 1 ? "▲" : "▼";
+        } else {
+          arrow.textContent = "↕";
+        }
+        th.appendChild(arrow);
+
+        th.addEventListener("click", () => toggleSort(tableKey, key));
         trh.appendChild(th);
       }
       thead.appendChild(trh);
       table.appendChild(thead);
 
       const tbody = document.createElement("tbody");
-      for (const row of rows) {
+      for (const row of sortedRows) {
         const tr = document.createElement("tr");
         for (const [key] of columns) {
           const td = document.createElement("td");
@@ -1147,8 +1228,8 @@
     function renderAll() {
       state.renderScheduled = false;
       state.summaryRows = snapshotSummaryRows();
-      renderTable("summaryBox", state.summaryRows, summaryColumns);
-      renderTable("detailBox", state.detailRows, detailColumns);
+      renderTable("summaryBox", state.summaryRows, summaryColumns, "summary");
+      renderTable("detailBox", state.detailRows, detailColumns, "detail");
       updateStats();
     }
 
@@ -1286,8 +1367,9 @@
 
     async function copySummary() {
       if (!state.summaryRows.length) return;
+      const rows = sortRows(state.summaryRows, summaryColumns, state.sort.summary);
       const header = summaryColumns.map(([, label]) => label).join("\t");
-      const lines = state.summaryRows.map(row => summaryColumns.map(([key]) => row[key] ?? "").join("\t"));
+      const lines = rows.map(row => summaryColumns.map(([key]) => row[key] ?? "").join("\t"));
       const text = [header, ...lines].join("\n");
       try {
         await navigator.clipboard.writeText(text);
@@ -1321,8 +1403,8 @@
     $("stopBtn").addEventListener("click", () => { state.abort = true; log("正在停止，已发出的请求会等待返回..."); });
     $("clearBtn").addEventListener("click", clearResults);
     $("sampleBtn").addEventListener("click", fillSample);
-    $("exportSummaryBtn").addEventListener("click", () => downloadCsv("opinx_summary.csv", state.summaryRows, summaryColumns));
-    $("exportDetailBtn").addEventListener("click", () => downloadCsv("opinx_detail.csv", state.detailRows, detailColumns));
+    $("exportSummaryBtn").addEventListener("click", () => downloadCsv("opinx_summary.csv", sortRows(state.summaryRows, summaryColumns, state.sort.summary), summaryColumns));
+    $("exportDetailBtn").addEventListener("click", () => downloadCsv("opinx_detail.csv", sortRows(state.detailRows, detailColumns, state.sort.detail), detailColumns));
     $("copySummaryBtn").addEventListener("click", copySummary);
 
     renderAll();
