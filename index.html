@@ -154,29 +154,29 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, minmax(145px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
+      grid-template-columns: repeat(4, minmax(135px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
     .stat {
       background: rgba(6, 12, 28, .72);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
-      min-height: 88px;
+      border-radius: 12px;
+      padding: 10px 12px;
     }
 
     .stat .k {
       color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 8px;
+      font-size: 11px;
+      margin-bottom: 4px;
     }
 
     .stat .v {
-      font-size: 21px;
+      font-size: 18px;
       font-weight: 800;
       overflow-wrap: anywhere;
+      letter-spacing: .2px;
     }
 
     .progressOuter {
@@ -262,9 +262,74 @@
 
     td.wallet {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      max-width: 210px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+
+    td.wallet .walletInner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    td.wallet code {
+      background: rgba(255,255,255,.05);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+
+    td.wallet .copyBtn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    td.wallet .copyBtn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th.sortable:hover { color: var(--accent); }
+
+    th.sortable .arrow {
+      display: inline-block;
+      margin-left: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    th.sortable.activeSort .arrow { color: var(--accent); }
+
+    tbody tr:hover { background: rgba(122, 162, 255, .05); }
+
+    .tableBar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tableBar input[type="search"] {
+      flex: 1;
+      min-width: 220px;
+      padding: 8px 11px;
+      font-size: 13px;
+    }
+
+    .tableBar .rowCount {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .ok { color: var(--ok); font-weight: 700; }
@@ -306,7 +371,7 @@
 <body>
   <div class="wrap">
     <h1>OPINX Predict 积分批量查询</h1>
-    <div class="subtitle">批量查询指定钱包的指定周数，统计交易量、手续费成本、交易次数和积分。总交易量 = paid_volume_usdt + free_volume_usdt；成本 = paid_fee_usdt。</div>
+    <div class="subtitle">批量查询指定钱包的指定周数，统计交易量、手续费成本、交易次数和积分。总交易量 = paid_volume_usdt + free_volume_usdt；手续费 = paid_fee_usdt × 手续费折扣；积分 = points × 积分倍率（与网站展示口径一致）。</div>
 
     <div class="grid">
       <section class="card">
@@ -337,6 +402,19 @@
             <div>
               <label for="timeoutMs">超时毫秒</label>
               <input id="timeoutMs" type="number" min="3000" step="1000" value="20000" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="pointsMultiplier">积分倍率</label>
+              <input id="pointsMultiplier" type="number" min="0" step="0.01" value="1.1" />
+              <div class="help">网站展示是 API 原值 ×1.1</div>
+            </div>
+            <div>
+              <label for="feeMultiplier">手续费折扣</label>
+              <input id="feeMultiplier" type="number" min="0" step="0.01" value="0.9" />
+              <div class="help">网站展示是 API 原值 ×0.9</div>
             </div>
           </div>
 
@@ -394,6 +472,11 @@
             <div class="tab" data-tab="detail">周明细</div>
           </div>
 
+          <div class="tableBar">
+            <input id="filterInput" type="search" placeholder="按钱包、状态、错误信息、周数过滤..." />
+            <div class="rowCount" id="rowCount">0 行</div>
+          </div>
+
           <div id="summaryBox" class="tableWrap"></div>
           <div id="detailBox" class="tableWrap" style="display:none"></div>
         </div>
@@ -414,7 +497,25 @@
       detailRows: [],
       summaryRows: [],
       startedAt: null,
+      activeTab: "summary",
+      filterText: "",
+      sort: {
+        summary: { key: null, dir: "asc" },
+        detail: { key: null, dir: "asc" },
+      },
     };
+
+    const numericKeys = new Set([
+      "rank", "total_points", "allocation_round_points",
+      "week", "trade_count",
+      "paid_volume_usdt", "free_volume_usdt", "total_volume_usdt",
+      "paid_fee_usdt", "cost_usdt", "points", "referral_points",
+    ]);
+
+    function shortWallet(addr) {
+      if (!addr || addr.length < 12) return addr || "";
+      return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+    }
 
     const detailColumns = [
       ["wallet", "钱包"],
@@ -654,11 +755,28 @@
       throw new Error(lastError || "请求失败");
     }
 
+    function decimalMul(value, multiplierText) {
+      const A = toScaled(value);
+      const M = toScaled(multiplierText);
+      const n = A.n * M.n;
+      return formatScaled(n, A.scale + M.scale);
+    }
+
+    function readMultiplier(id, fallback) {
+      const raw = ($(id).value || "").trim();
+      if (!raw) return fallback;
+      const normalized = normalizeDecimal(raw);
+      return normalized === "0" && raw !== "0" ? fallback : normalized;
+    }
+
     function buildRows(wallet, data, selectedWeeks) {
       const rows = [];
       const leaderboard = data && data.leaderboard ? data.leaderboard : {};
       const weeks = Array.isArray(data && data.weeks) ? data.weeks : [];
       const weekMap = new Map();
+
+      const pointsMul = readMultiplier("pointsMultiplier", "1.1");
+      const feeMul = readMultiplier("feeMultiplier", "0.9");
 
       for (const w of weeks) {
         weekMap.set(Number(w.week), w);
@@ -698,8 +816,10 @@
         const paidVolume = normalizeDecimal(item.paid_volume_usdt ?? "0");
         const freeVolume = normalizeDecimal(item.free_volume_usdt ?? "0");
         const totalVolume = decimalAdd(paidVolume, freeVolume);
-        const paidFee = normalizeDecimal(item.paid_fee_usdt ?? "0");
-        const points = normalizeDecimal(item.points ?? "0");
+        const rawFee = normalizeDecimal(item.paid_fee_usdt ?? "0");
+        const paidFee = decimalMul(rawFee, feeMul);
+        const rawPoints = normalizeDecimal(item.points ?? "0");
+        const points = decimalMul(rawPoints, pointsMul);
         const referralPoints = normalizeDecimal(item.referral_points ?? "0");
 
         rows.push({
@@ -854,35 +974,120 @@
       return "";
     }
 
-    function renderTable(containerId, rows, columns) {
+    function filterRows(rows) {
+      const q = state.filterText.trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter(row => {
+        for (const key in row) {
+          const v = row[key];
+          if (v === null || v === undefined) continue;
+          if (String(v).toLowerCase().includes(q)) return true;
+        }
+        return false;
+      });
+    }
+
+    function sortRows(rows, sortState) {
+      if (!sortState.key) return rows;
+      const key = sortState.key;
+      const dir = sortState.dir === "desc" ? -1 : 1;
+      const numeric = numericKeys.has(key);
+
+      return [...rows].sort((a, b) => {
+        const va = a[key], vb = b[key];
+        const aEmpty = va === "" || va === null || va === undefined;
+        const bEmpty = vb === "" || vb === null || vb === undefined;
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+        if (numeric) {
+          return (Number(va) - Number(vb)) * dir;
+        }
+        return String(va).localeCompare(String(vb)) * dir;
+      });
+    }
+
+    function renderCellValue(td, key, value) {
+      if (key === "wallet" && value) {
+        td.innerHTML = "";
+        td.title = value;
+        const wrap = document.createElement("span");
+        wrap.className = "walletInner";
+        const code = document.createElement("code");
+        code.textContent = shortWallet(value);
+        const btn = document.createElement("button");
+        btn.className = "copyBtn";
+        btn.type = "button";
+        btn.textContent = "复制";
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(value);
+            btn.textContent = "已复制";
+            setTimeout(() => { btn.textContent = "复制"; }, 1200);
+          } catch { btn.textContent = "失败"; }
+        });
+        wrap.append(code, btn);
+        td.appendChild(wrap);
+        return;
+      }
+      td.textContent = value;
+      td.title = value;
+    }
+
+    function renderTable(containerId, rows, columns, tableKey) {
       const box = $(containerId);
-      if (!rows.length) {
-        box.innerHTML = `<div style="padding:18px;color:var(--muted)">暂无数据</div>`;
+      const filtered = filterRows(rows);
+      const sorted = sortRows(filtered, state.sort[tableKey]);
+
+      if (state.activeTab === tableKey) {
+        $("rowCount").textContent = `${sorted.length} 行${rows.length !== sorted.length ? ` / 共 ${rows.length}` : ""}`;
+      }
+
+      if (!sorted.length) {
+        box.innerHTML = `<div style="padding:18px;color:var(--muted)">${rows.length ? "没有匹配的行" : "暂无数据"}</div>`;
         return;
       }
 
       const table = document.createElement("table");
       const thead = document.createElement("thead");
       const trh = document.createElement("tr");
+      const sortState = state.sort[tableKey];
 
-      for (const [, label] of columns) {
+      for (const [key, label] of columns) {
         const th = document.createElement("th");
-        th.textContent = label;
+        th.className = "sortable";
+        if (sortState.key === key) th.classList.add("activeSort");
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = label;
+        const arrow = document.createElement("span");
+        arrow.className = "arrow";
+        arrow.textContent = sortState.key === key ? (sortState.dir === "desc" ? "▼" : "▲") : "↕";
+        th.append(labelSpan, arrow);
+        th.addEventListener("click", () => {
+          const s = state.sort[tableKey];
+          if (s.key === key) {
+            s.dir = s.dir === "asc" ? "desc" : "asc";
+          } else {
+            s.key = key;
+            s.dir = numericKeys.has(key) ? "desc" : "asc";
+          }
+          renderAll();
+        });
         trh.appendChild(th);
       }
       thead.appendChild(trh);
       table.appendChild(thead);
 
       const tbody = document.createElement("tbody");
-      for (const row of rows) {
+      for (const row of sorted) {
         const tr = document.createElement("tr");
         for (const [key] of columns) {
           const td = document.createElement("td");
           const value = row[key] ?? "";
-          td.textContent = value;
-          td.title = value;
+          renderCellValue(td, key, value);
           const cls = cellClass(key, value);
-          if (cls) td.className = cls;
+          if (cls) td.className = td.className ? `${td.className} ${cls}` : cls;
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -895,8 +1100,8 @@
 
     function renderAll() {
       state.summaryRows = buildSummaryRows(state.detailRows);
-      renderTable("summaryBox", state.summaryRows, summaryColumns);
-      renderTable("detailBox", state.detailRows, detailColumns);
+      renderTable("summaryBox", state.summaryRows, summaryColumns, "summary");
+      renderTable("detailBox", state.detailRows, detailColumns, "detail");
       updateStats();
     }
 
@@ -1038,9 +1243,16 @@
         document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
         tab.classList.add("active");
         const name = tab.dataset.tab;
+        state.activeTab = name;
         $("summaryBox").style.display = name === "summary" ? "block" : "none";
         $("detailBox").style.display = name === "detail" ? "block" : "none";
+        renderAll();
       });
+    });
+
+    $("filterInput").addEventListener("input", (e) => {
+      state.filterText = e.target.value || "";
+      renderAll();
     });
 
     $("startBtn").addEventListener("click", runQuery);
