@@ -404,6 +404,17 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
+    function initAggregates() {
+      return {
+        volume: "0",
+        cost: "0",
+        trades: "0",
+        points: "0",
+        calculated: 0,
+        uncalculated: 0,
+      };
+    }
+
     const state = {
       abort: false,
       running: false,
@@ -413,7 +424,10 @@
       failedWallets: 0,
       detailRows: [],
       summaryRows: [],
+      summaryMap: new Map(),
+      aggregates: initAggregates(),
       startedAt: null,
+      renderScheduled: false,
     };
 
     const detailColumns = [
@@ -577,10 +591,6 @@
       return formatScaled(n, scale);
     }
 
-    function decimalSum(values) {
-      return values.reduce((acc, v) => decimalAdd(acc, v), "0");
-    }
-
     function shortDecimal(value, maxDp = 6) {
       const s = normalizeDecimal(value);
       if (!s.includes(".")) return s;
@@ -603,12 +613,8 @@
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    function makeUrl(wallet) {
-      const template = $("apiTemplate").value.trim();
-      if (!template.includes("{wallet}")) throw new Error("API 模板必须包含 {wallet}");
-
-      const realUrl = template.replaceAll("{wallet}", wallet);
-      const proxyPrefix = $("proxyPrefix").value.trim();
+    function makeUrl(wallet, urlTemplate, proxyPrefix) {
+      const realUrl = urlTemplate.replaceAll("{wallet}", wallet);
       return proxyPrefix ? proxyPrefix + encodeURIComponent(realUrl) : realUrl;
     }
 
@@ -634,19 +640,17 @@
       }
     }
 
-    async function fetchWallet(wallet) {
-      const retries = Math.max(0, Number($("retries").value || 0));
-      const timeoutMs = Math.max(3000, Number($("timeoutMs").value || 20000));
-      const url = makeUrl(wallet);
+    async function fetchWallet(wallet, config) {
+      const url = makeUrl(wallet, config.urlTemplate, config.proxyPrefix);
 
       let lastError = "";
-      for (let attempt = 0; attempt <= retries; attempt++) {
+      for (let attempt = 0; attempt <= config.retries; attempt++) {
         if (state.abort) throw new Error("已停止");
         try {
-          return await fetchJsonWithTimeout(url, timeoutMs);
+          return await fetchJsonWithTimeout(url, config.timeoutMs);
         } catch (err) {
           lastError = err && err.message ? err.message : String(err);
-          if (attempt < retries) {
+          if (attempt < config.retries) {
             await sleep(700 * (attempt + 1));
           }
         }
@@ -750,86 +754,94 @@
       };
     }
 
-    function buildSummaryRows(detailRows) {
-      const map = new Map();
-
-      for (const row of detailRows) {
-        const wallet = row.wallet;
-        if (!map.has(wallet)) {
-          map.set(wallet, {
-            wallet,
-            status: row.status === "error" ? "error" : "ok",
-            rank: row.rank || "",
-            total_points: row.total_points || "0",
-            selected_weeks: [],
-            calculated_all: "true",
-            trade_count: "0",
-            paid_volume_usdt: "0",
-            free_volume_usdt: "0",
-            total_volume_usdt: "0",
-            paid_fee_usdt: "0",
-            cost_usdt: "0",
-            points: "0",
-            referral_points: "0",
-            error: ""
-          });
-        }
-
-        const s = map.get(wallet);
-        if (row.status === "error") {
-          s.status = "error";
-          s.calculated_all = "";
-          s.error = row.error || "请求失败";
-          continue;
-        }
-
-        if (row.status !== "ok") {
-          if (!s.error) s.error = row.error || row.status;
-          continue;
-        }
-
-        s.rank = row.rank || s.rank;
-        s.total_points = row.total_points || s.total_points;
-        s.selected_weeks.push(String(row.week));
-
-        if (String(row.calculated).toLowerCase() !== "true") {
-          s.calculated_all = "false";
-        }
-
-        s.trade_count = decimalAdd(s.trade_count, row.trade_count || "0");
-        s.paid_volume_usdt = decimalAdd(s.paid_volume_usdt, row.paid_volume_usdt || "0");
-        s.free_volume_usdt = decimalAdd(s.free_volume_usdt, row.free_volume_usdt || "0");
-        s.total_volume_usdt = decimalAdd(s.total_volume_usdt, row.total_volume_usdt || "0");
-        s.paid_fee_usdt = decimalAdd(s.paid_fee_usdt, row.paid_fee_usdt || "0");
-        s.cost_usdt = decimalAdd(s.cost_usdt, row.cost_usdt || "0");
-        s.points = decimalAdd(s.points, row.points || "0");
-        s.referral_points = decimalAdd(s.referral_points, row.referral_points || "0");
+    function updateSummaryForRow(row) {
+      const wallet = row.wallet;
+      let s = state.summaryMap.get(wallet);
+      if (!s) {
+        s = {
+          wallet,
+          status: row.status === "error" ? "error" : "ok",
+          rank: row.rank || "",
+          total_points: row.total_points || "0",
+          selected_weeks: [],
+          calculated_all: "true",
+          trade_count: "0",
+          paid_volume_usdt: "0",
+          free_volume_usdt: "0",
+          total_volume_usdt: "0",
+          paid_fee_usdt: "0",
+          cost_usdt: "0",
+          points: "0",
+          referral_points: "0",
+          error: ""
+        };
+        state.summaryMap.set(wallet, s);
       }
 
-      return [...map.values()].map(row => ({
-        ...row,
-        selected_weeks: row.selected_weeks.join(",")
-      }));
+      if (row.status === "error") {
+        s.status = "error";
+        s.calculated_all = "";
+        s.error = row.error || "请求失败";
+        return;
+      }
+
+      if (row.status !== "ok") {
+        if (!s.error) s.error = row.error || row.status;
+        return;
+      }
+
+      s.rank = row.rank || s.rank;
+      s.total_points = row.total_points || s.total_points;
+      s.selected_weeks.push(String(row.week));
+
+      if (String(row.calculated).toLowerCase() !== "true") {
+        s.calculated_all = "false";
+      }
+
+      s.trade_count = decimalAdd(s.trade_count, row.trade_count || "0");
+      s.paid_volume_usdt = decimalAdd(s.paid_volume_usdt, row.paid_volume_usdt || "0");
+      s.free_volume_usdt = decimalAdd(s.free_volume_usdt, row.free_volume_usdt || "0");
+      s.total_volume_usdt = decimalAdd(s.total_volume_usdt, row.total_volume_usdt || "0");
+      s.paid_fee_usdt = decimalAdd(s.paid_fee_usdt, row.paid_fee_usdt || "0");
+      s.cost_usdt = decimalAdd(s.cost_usdt, row.cost_usdt || "0");
+      s.points = decimalAdd(s.points, row.points || "0");
+      s.referral_points = decimalAdd(s.referral_points, row.referral_points || "0");
+    }
+
+    function addDetailRows(rows) {
+      for (const row of rows) {
+        state.detailRows.push(row);
+        updateSummaryForRow(row);
+        if (row.status !== "ok") continue;
+
+        const agg = state.aggregates;
+        agg.volume = decimalAdd(agg.volume, row.total_volume_usdt || "0");
+        agg.cost = decimalAdd(agg.cost, row.cost_usdt || "0");
+        agg.trades = decimalAdd(agg.trades, row.trade_count || "0");
+        agg.points = decimalAdd(agg.points, row.points || "0");
+        if (row.calculated === "true") agg.calculated += 1;
+        else if (row.calculated === "false") agg.uncalculated += 1;
+      }
+    }
+
+    function snapshotSummaryRows() {
+      const out = [];
+      for (const row of state.summaryMap.values()) {
+        out.push({ ...row, selected_weeks: row.selected_weeks.join(",") });
+      }
+      return out;
     }
 
     function updateStats() {
+      const agg = state.aggregates;
       $("statProgress").textContent = `${state.completedWallets} / ${state.totalWallets}`;
       $("statOkFail").textContent = `${state.successWallets} / ${state.failedWallets}`;
-
-      const okRows = state.detailRows.filter(r => r.status === "ok");
-      const totalVolume = decimalSum(okRows.map(r => r.total_volume_usdt));
-      const totalCost = decimalSum(okRows.map(r => r.cost_usdt));
-      const totalTrades = decimalSum(okRows.map(r => r.trade_count));
-      const totalPoints = decimalSum(okRows.map(r => r.points));
-      const calculated = okRows.filter(r => r.calculated === "true").length;
-      const uncalculated = okRows.filter(r => r.calculated === "false").length;
-
-      $("statVolume").textContent = shortDecimal(totalVolume, 4);
-      $("statCost").textContent = shortDecimal(totalCost, 8);
-      $("statTrades").textContent = totalTrades;
-      $("statPoints").textContent = shortDecimal(totalPoints, 6);
-      $("statCalculated").textContent = String(calculated);
-      $("statUncalculated").textContent = String(uncalculated);
+      $("statVolume").textContent = shortDecimal(agg.volume, 4);
+      $("statCost").textContent = shortDecimal(agg.cost, 8);
+      $("statTrades").textContent = agg.trades;
+      $("statPoints").textContent = shortDecimal(agg.points, 6);
+      $("statCalculated").textContent = String(agg.calculated);
+      $("statUncalculated").textContent = String(agg.uncalculated);
 
       const pct = state.totalWallets ? Math.round(state.completedWallets / state.totalWallets * 100) : 0;
       $("progressBar").style.width = `${pct}%`;
@@ -861,6 +873,7 @@
         return;
       }
 
+      const fragment = document.createDocumentFragment();
       const table = document.createElement("table");
       const thead = document.createElement("thead");
       const trh = document.createElement("tr");
@@ -888,16 +901,24 @@
         tbody.appendChild(tr);
       }
       table.appendChild(tbody);
+      fragment.appendChild(table);
 
-      box.innerHTML = "";
-      box.appendChild(table);
+      box.textContent = "";
+      box.appendChild(fragment);
     }
 
     function renderAll() {
-      state.summaryRows = buildSummaryRows(state.detailRows);
+      state.renderScheduled = false;
+      state.summaryRows = snapshotSummaryRows();
       renderTable("summaryBox", state.summaryRows, summaryColumns);
       renderTable("detailBox", state.detailRows, detailColumns);
       updateStats();
+    }
+
+    function scheduleRender() {
+      if (state.renderScheduled) return;
+      state.renderScheduled = true;
+      requestAnimationFrame(renderAll);
     }
 
     async function runQuery() {
@@ -917,6 +938,19 @@
         return;
       }
 
+      const urlTemplate = $("apiTemplate").value.trim();
+      if (!urlTemplate.includes("{wallet}")) {
+        alert("API 模板必须包含 {wallet}");
+        return;
+      }
+
+      const config = {
+        retries: Math.max(0, Number($("retries").value || 0)),
+        timeoutMs: Math.max(3000, Number($("timeoutMs").value || 20000)),
+        urlTemplate,
+        proxyPrefix: $("proxyPrefix").value.trim(),
+      };
+
       let concurrency = Math.max(1, Math.min(50, Number($("concurrency").value || 5)));
       concurrency = Math.min(concurrency, wallets.length);
 
@@ -928,6 +962,8 @@
       state.failedWallets = 0;
       state.detailRows = [];
       state.summaryRows = [];
+      state.summaryMap = new Map();
+      state.aggregates = initAggregates();
       state.startedAt = Date.now();
 
       $("startBtn").disabled = true;
@@ -937,7 +973,7 @@
 
       let cursor = 0;
 
-      async function worker(workerId) {
+      async function worker() {
         while (!state.abort) {
           const idx = cursor++;
           if (idx >= wallets.length) break;
@@ -945,25 +981,24 @@
           const wallet = wallets[idx];
           try {
             log(`查询中 ${idx + 1}/${wallets.length}: ${wallet}`);
-            const data = await fetchWallet(wallet);
-            const rows = buildRows(wallet, data, selectedWeeks);
-            state.detailRows.push(...rows);
+            const data = await fetchWallet(wallet, config);
+            addDetailRows(buildRows(wallet, data, selectedWeeks));
             state.successWallets += 1;
             log(`完成 ${idx + 1}/${wallets.length}: ${wallet}`);
           } catch (err) {
             const message = err && err.message ? err.message : String(err);
-            state.detailRows.push(buildErrorDetailRow(wallet, message));
+            addDetailRows([buildErrorDetailRow(wallet, message)]);
             state.failedWallets += 1;
             log(`失败 ${idx + 1}/${wallets.length}: ${wallet} | ${message}`);
           } finally {
             state.completedWallets += 1;
-            renderAll();
+            scheduleRender();
           }
         }
       }
 
       try {
-        await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i + 1)));
+        await Promise.all(Array.from({ length: concurrency }, () => worker()));
       } finally {
         state.running = false;
         $("startBtn").disabled = false;
@@ -983,6 +1018,8 @@
       state.failedWallets = 0;
       state.detailRows = [];
       state.summaryRows = [];
+      state.summaryMap = new Map();
+      state.aggregates = initAggregates();
       $("progressBar").style.width = "0%";
       setLog("已清空结果。等待开始...");
       renderAll();
