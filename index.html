@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OPINX Predict 积分批量查询</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111936;
+      --panel2: #0f1730;
+      --text: #e9eefc;
+      --muted: #9eacc9;
+      --line: #24304f;
+      --accent: #7aa2ff;
+      --ok: #66d39e;
+      --warn: #ffd166;
+      --bad: #ff7b7b;
+      --shadow: 0 18px 50px rgba(0,0,0,.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #17234a 0, var(--bg) 34%, #070a13 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.45;
+    }
+
+    .wrap {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 28px 18px 44px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: .2px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card .hd {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+      font-weight: 700;
+    }
+
+    .card .bd { padding: 18px; }
+
+    label {
+      display: block;
+      margin: 0 0 7px;
+      color: #dbe5ff;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    textarea, input, select {
+      width: 100%;
+      color: var(--text);
+      background: rgba(4, 8, 20, .78);
+      border: 1px solid #2c395d;
+      border-radius: 12px;
+      padding: 11px 12px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+
+    textarea {
+      min-height: 240px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .field { margin-top: 14px; }
+
+    .help {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      border-radius: 12px;
+      padding: 11px 14px;
+      color: #091124;
+      background: var(--accent);
+      font-weight: 750;
+      font-size: 14px;
+    }
+
+    button.secondary {
+      background: #263452;
+      color: var(--text);
+      border: 1px solid #34446a;
+    }
+
+    button.warn {
+      background: var(--warn);
+      color: #201705;
+    }
+
+    button.bad {
+      background: #56303a;
+      color: #ffdce3;
+      border: 1px solid #77424f;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(145px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: rgba(6, 12, 28, .72);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 88px;
+    }
+
+    .stat .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .stat .v {
+      font-size: 21px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .progressOuter {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,.08);
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .progressInner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #9ef0c6);
+      transition: width .2s ease;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0 12px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .tab.active {
+      color: #061025;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .tools {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .tools button { width: auto; }
+
+    .tableWrap {
+      max-height: 560px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(4,8,20,.48);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1180px;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 10px 11px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #111936;
+      color: #dce6ff;
+      font-size: 12px;
+    }
+
+    td.wallet {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      max-width: 210px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ok { color: var(--ok); font-weight: 700; }
+    .badText { color: var(--bad); font-weight: 700; }
+    .warnText { color: var(--warn); font-weight: 700; }
+    .muted { color: var(--muted); }
+
+    .log {
+      margin-top: 14px;
+      height: 130px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(2,6,16,.78);
+      padding: 10px 12px;
+      color: #b8c5e4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .note {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 13px;
+      border: 1px solid rgba(255, 209, 102, .24);
+      background: rgba(255, 209, 102, .08);
+      color: #ffe6a6;
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>OPINX Predict 积分批量查询</h1>
+    <div class="subtitle">批量查询指定钱包的指定周数，统计交易量、手续费成本、交易次数和积分。总交易量 = paid_volume_usdt + free_volume_usdt；成本 = paid_fee_usdt。</div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">查询配置</div>
+        <div class="bd">
+          <label for="wallets">钱包地址</label>
+          <textarea id="wallets" placeholder="一行一个钱包，或者直接粘贴一堆文本，页面会自动提取 0x 钱包地址">0x6dcf1f5b09dfbe711fe7278c072eecac55a8e327</textarea>
+          <div class="help">支持自动去重。格式必须是 0x + 40 位十六进制字符。</div>
+
+          <div class="row">
+            <div>
+              <label for="weeks">指定周数</label>
+              <input id="weeks" value="18" placeholder="例如：18 或 17,18 或 1-18；留空=全部周" />
+              <div class="help">支持：18、17,18、1-18、1-3,17,18</div>
+            </div>
+            <div>
+              <label for="concurrency">并发数量</label>
+              <input id="concurrency" type="number" min="1" max="50" value="5" />
+              <div class="help">建议 3-10，太高可能被限流。</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="retries">失败重试</label>
+              <input id="retries" type="number" min="0" max="10" value="3" />
+            </div>
+            <div>
+              <label for="timeoutMs">超时毫秒</label>
+              <input id="timeoutMs" type="number" min="3000" step="1000" value="20000" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="apiTemplate">API 模板</label>
+            <input id="apiTemplate" value="https://tool.opinx.app/api/predict/points/{wallet}" />
+            <div class="help">必须包含 {wallet} 占位符。</div>
+          </div>
+
+          <div class="field">
+            <label for="proxyPrefix">代理前缀，可选</label>
+            <input id="proxyPrefix" placeholder="正常留空。如果浏览器报 CORS，可填你自己的代理前缀，例如 https://你的域名/proxy?url=" />
+            <div class="help">留空为直连。填写后会请求：代理前缀 + encodeURIComponent(真实 API URL)。</div>
+          </div>
+
+          <div class="buttons">
+            <button id="startBtn">开始查询</button>
+            <button id="stopBtn" class="bad" disabled>停止</button>
+            <button id="clearBtn" class="secondary">清空结果</button>
+            <button id="sampleBtn" class="secondary">填入示例</button>
+          </div>
+
+          <div class="note">
+            如果打开页面后请求失败并提示 <b>Failed to fetch</b> 或 <b>CORS</b>，说明接口没有允许浏览器跨域读取。单 HTML 页面无法绕过浏览器限制，需要你用自己的后端/Nginx/Cloudflare Worker 做一个转发代理。
+          </div>
+
+          <div id="log" class="log">等待开始...</div>
+        </div>
+      </section>
+
+      <main class="card">
+        <div class="hd">查询结果</div>
+        <div class="bd">
+          <div class="stats">
+            <div class="stat"><div class="k">钱包数量 / 已完成</div><div class="v" id="statProgress">0 / 0</div></div>
+            <div class="stat"><div class="k">成功 / 失败</div><div class="v" id="statOkFail">0 / 0</div></div>
+            <div class="stat"><div class="k">汇总交易量 USDT</div><div class="v" id="statVolume">0</div></div>
+            <div class="stat"><div class="k">汇总成本 USDT</div><div class="v" id="statCost">0</div></div>
+            <div class="stat"><div class="k">汇总交易次数</div><div class="v" id="statTrades">0</div></div>
+            <div class="stat"><div class="k">汇总积分</div><div class="v" id="statPoints">0</div></div>
+            <div class="stat"><div class="k">已结算明细行</div><div class="v" id="statCalculated">0</div></div>
+            <div class="stat"><div class="k">未结算明细行</div><div class="v" id="statUncalculated">0</div></div>
+          </div>
+
+          <div class="progressOuter"><div id="progressBar" class="progressInner"></div></div>
+
+          <div class="tools">
+            <button id="exportSummaryBtn" class="warn" disabled>导出汇总 CSV</button>
+            <button id="exportDetailBtn" class="warn" disabled>导出明细 CSV</button>
+            <button id="copySummaryBtn" class="secondary" disabled>复制汇总表</button>
+          </div>
+
+          <div class="tabs">
+            <div class="tab active" data-tab="summary">钱包汇总</div>
+            <div class="tab" data-tab="detail">周明细</div>
+          </div>
+
+          <div id="summaryBox" class="tableWrap"></div>
+          <div id="detailBox" class="tableWrap" style="display:none"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const state = {
+      abort: false,
+      running: false,
+      totalWallets: 0,
+      completedWallets: 0,
+      successWallets: 0,
+      failedWallets: 0,
+      detailRows: [],
+      summaryRows: [],
+      startedAt: null,
+    };
+
+    const detailColumns = [
+      ["wallet", "钱包"],
+      ["status", "状态"],
+      ["rank", "排名"],
+      ["total_points", "总积分"],
+      ["allocation_round_points", "本轮积分"],
+      ["week", "周"],
+      ["calculated", "已结算"],
+      ["week_start_utc8", "开始时间 UTC+8"],
+      ["week_end_utc8", "结束时间 UTC+8"],
+      ["trade_count", "交易次数"],
+      ["paid_volume_usdt", "付费交易量"],
+      ["free_volume_usdt", "免费交易量"],
+      ["total_volume_usdt", "总交易量"],
+      ["paid_fee_usdt", "手续费"],
+      ["cost_usdt", "成本"],
+      ["points", "周积分"],
+      ["referral_points", "推荐积分"],
+      ["error", "错误"]
+    ];
+
+    const summaryColumns = [
+      ["wallet", "钱包"],
+      ["status", "状态"],
+      ["rank", "排名"],
+      ["total_points", "当前总积分"],
+      ["selected_weeks", "统计周数"],
+      ["calculated_all", "全部已结算"],
+      ["trade_count", "交易次数"],
+      ["paid_volume_usdt", "付费交易量"],
+      ["free_volume_usdt", "免费交易量"],
+      ["total_volume_usdt", "总交易量"],
+      ["paid_fee_usdt", "手续费"],
+      ["cost_usdt", "成本"],
+      ["points", "统计周积分"],
+      ["referral_points", "推荐积分"],
+      ["error", "错误"]
+    ];
+
+    function log(message) {
+      const el = $("log");
+      const now = new Date().toLocaleTimeString();
+      el.textContent += `\n[${now}] ${message}`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setLog(message) {
+      $("log").textContent = message;
+    }
+
+    function extractWallets(text) {
+      const matches = text.match(/0x[a-fA-F0-9]{40}/g) || [];
+      const seen = new Set();
+      const wallets = [];
+      for (const w of matches) {
+        const lower = w.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          wallets.push(lower);
+        }
+      }
+      return wallets;
+    }
+
+    function parseWeeks(input) {
+      const s = input.trim();
+      if (!s) return null;
+
+      const result = new Set();
+      const parts = s.split(",");
+
+      for (const raw of parts) {
+        const part = raw.trim();
+        if (!part) continue;
+
+        if (part.includes("-")) {
+          const pair = part.split("-").map(x => Number(x.trim()));
+          if (pair.length !== 2 || !Number.isInteger(pair[0]) || !Number.isInteger(pair[1])) {
+            throw new Error(`周数格式错误：${part}`);
+          }
+          let [start, end] = pair;
+          if (start > end) [start, end] = [end, start];
+          for (let i = start; i <= end; i++) result.add(i);
+        } else {
+          const n = Number(part);
+          if (!Number.isInteger(n)) throw new Error(`周数格式错误：${part}`);
+          result.add(n);
+        }
+      }
+
+      return [...result].sort((a, b) => a - b);
+    }
+
+    function expandExponential(value) {
+      const s = String(value).trim();
+      if (!/[eE]/.test(s)) return s;
+
+      const n = Number(s);
+      if (!Number.isFinite(n)) return "0";
+
+      // 足够覆盖这个接口里常见的小数位，不用于金融结算，只用于展示/统计。
+      return n.toFixed(30).replace(/0+$/, "").replace(/\.$/, "");
+    }
+
+    function normalizeDecimal(value) {
+      if (value === null || value === undefined || value === "") return "0";
+      let s = expandExponential(value).replace(/,/g, "").trim();
+      if (!s || s === ".") return "0";
+
+      let sign = "";
+      if (s[0] === "-") {
+        sign = "-";
+        s = s.slice(1);
+      } else if (s[0] === "+") {
+        s = s.slice(1);
+      }
+
+      if (!/^\d*(\.\d*)?$/.test(s)) return "0";
+      let [intPart, fracPart = ""] = s.split(".");
+      intPart = intPart.replace(/^0+(?=\d)/, "") || "0";
+      fracPart = fracPart.replace(/0+$/, "");
+      const out = fracPart ? `${intPart}.${fracPart}` : intPart;
+      return sign && out !== "0" ? sign + out : out;
+    }
+
+    function toScaled(value) {
+      const s = normalizeDecimal(value);
+      const negative = s.startsWith("-");
+      const body = negative ? s.slice(1) : s;
+      const [intPart, fracPart = ""] = body.split(".");
+      const digits = BigInt((intPart + fracPart).replace(/^0+(?=\d)/, "") || "0") * (negative ? -1n : 1n);
+      return { n: digits, scale: fracPart.length };
+    }
+
+    function pow10(n) {
+      return 10n ** BigInt(n);
+    }
+
+    function formatScaled(n, scale) {
+      const negative = n < 0n;
+      let s = (negative ? -n : n).toString();
+
+      if (scale > 0) {
+        if (s.length <= scale) s = "0".repeat(scale - s.length + 1) + s;
+        const idx = s.length - scale;
+        s = s.slice(0, idx) + "." + s.slice(idx);
+      }
+
+      s = s.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+      if (!s) s = "0";
+      return negative && s !== "0" ? "-" + s : s;
+    }
+
+    function decimalAdd(a, b) {
+      const A = toScaled(a);
+      const B = toScaled(b);
+      const scale = Math.max(A.scale, B.scale);
+      const n = A.n * pow10(scale - A.scale) + B.n * pow10(scale - B.scale);
+      return formatScaled(n, scale);
+    }
+
+    function decimalSum(values) {
+      return values.reduce((acc, v) => decimalAdd(acc, v), "0");
+    }
+
+    function shortDecimal(value, maxDp = 6) {
+      const s = normalizeDecimal(value);
+      if (!s.includes(".")) return s;
+      const negative = s.startsWith("-");
+      const body = negative ? s.slice(1) : s;
+      const [i, f = ""] = body.split(".");
+      const cut = f.slice(0, maxDp).replace(/0+$/, "");
+      const out = cut ? `${i}.${cut}` : i;
+      return negative ? "-" + out : out;
+    }
+
+    function timestampToUTC8(ts) {
+      if (!ts && ts !== 0) return "";
+      const n = Number(ts);
+      if (!Number.isFinite(n)) return "";
+      return new Date((n + 8 * 3600) * 1000).toISOString().replace("T", " ").slice(0, 19);
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function makeUrl(wallet) {
+      const template = $("apiTemplate").value.trim();
+      if (!template.includes("{wallet}")) throw new Error("API 模板必须包含 {wallet}");
+
+      const realUrl = template.replaceAll("{wallet}", wallet);
+      const proxyPrefix = $("proxyPrefix").value.trim();
+      return proxyPrefix ? proxyPrefix + encodeURIComponent(realUrl) : realUrl;
+    }
+
+    async function fetchJsonWithTimeout(url, timeoutMs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { "Accept": "application/json" },
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`HTTP ${res.status} ${res.statusText}${text ? " - " + text.slice(0, 160) : ""}`);
+        }
+
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function fetchWallet(wallet) {
+      const retries = Math.max(0, Number($("retries").value || 0));
+      const timeoutMs = Math.max(3000, Number($("timeoutMs").value || 20000));
+      const url = makeUrl(wallet);
+
+      let lastError = "";
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        if (state.abort) throw new Error("已停止");
+        try {
+          return await fetchJsonWithTimeout(url, timeoutMs);
+        } catch (err) {
+          lastError = err && err.message ? err.message : String(err);
+          if (attempt < retries) {
+            await sleep(700 * (attempt + 1));
+          }
+        }
+      }
+      throw new Error(lastError || "请求失败");
+    }
+
+    function buildRows(wallet, data, selectedWeeks) {
+      const rows = [];
+      const leaderboard = data && data.leaderboard ? data.leaderboard : {};
+      const weeks = Array.isArray(data && data.weeks) ? data.weeks : [];
+      const weekMap = new Map();
+
+      for (const w of weeks) {
+        weekMap.set(Number(w.week), w);
+      }
+
+      const targetWeeks = selectedWeeks === null
+        ? [...weekMap.keys()].sort((a, b) => a - b)
+        : selectedWeeks;
+
+      for (const weekNo of targetWeeks) {
+        const item = weekMap.get(Number(weekNo));
+
+        if (!item) {
+          rows.push({
+            wallet,
+            status: "week_not_found",
+            rank: leaderboard.rank ?? "",
+            total_points: normalizeDecimal(leaderboard.total_points ?? "0"),
+            allocation_round_points: normalizeDecimal(leaderboard.allocation_round_points ?? "0"),
+            week: weekNo,
+            calculated: "",
+            week_start_utc8: "",
+            week_end_utc8: "",
+            trade_count: "0",
+            paid_volume_usdt: "0",
+            free_volume_usdt: "0",
+            total_volume_usdt: "0",
+            paid_fee_usdt: "0",
+            cost_usdt: "0",
+            points: "0",
+            referral_points: "0",
+            error: "接口没有返回这一周"
+          });
+          continue;
+        }
+
+        const paidVolume = normalizeDecimal(item.paid_volume_usdt ?? "0");
+        const freeVolume = normalizeDecimal(item.free_volume_usdt ?? "0");
+        const totalVolume = decimalAdd(paidVolume, freeVolume);
+        const paidFee = normalizeDecimal(item.paid_fee_usdt ?? "0");
+        const points = normalizeDecimal(item.points ?? "0");
+        const referralPoints = normalizeDecimal(item.referral_points ?? "0");
+
+        rows.push({
+          wallet,
+          status: "ok",
+          rank: leaderboard.rank ?? "",
+          total_points: normalizeDecimal(leaderboard.total_points ?? "0"),
+          allocation_round_points: normalizeDecimal(leaderboard.allocation_round_points ?? "0"),
+          week: item.week ?? weekNo,
+          calculated: item.calculated === true ? "true" : item.calculated === false ? "false" : "",
+          week_start_utc8: timestampToUTC8(item.week_start),
+          week_end_utc8: timestampToUTC8(item.week_end),
+          trade_count: String(item.trade_count ?? 0),
+          paid_volume_usdt: paidVolume,
+          free_volume_usdt: freeVolume,
+          total_volume_usdt: totalVolume,
+          paid_fee_usdt: paidFee,
+          cost_usdt: paidFee,
+          points,
+          referral_points: referralPoints,
+          error: ""
+        });
+      }
+
+      return rows;
+    }
+
+    function buildErrorDetailRow(wallet, error) {
+      return {
+        wallet,
+        status: "error",
+        rank: "",
+        total_points: "0",
+        allocation_round_points: "0",
+        week: "",
+        calculated: "",
+        week_start_utc8: "",
+        week_end_utc8: "",
+        trade_count: "0",
+        paid_volume_usdt: "0",
+        free_volume_usdt: "0",
+        total_volume_usdt: "0",
+        paid_fee_usdt: "0",
+        cost_usdt: "0",
+        points: "0",
+        referral_points: "0",
+        error
+      };
+    }
+
+    function buildSummaryRows(detailRows) {
+      const map = new Map();
+
+      for (const row of detailRows) {
+        const wallet = row.wallet;
+        if (!map.has(wallet)) {
+          map.set(wallet, {
+            wallet,
+            status: row.status === "error" ? "error" : "ok",
+            rank: row.rank || "",
+            total_points: row.total_points || "0",
+            selected_weeks: [],
+            calculated_all: "true",
+            trade_count: "0",
+            paid_volume_usdt: "0",
+            free_volume_usdt: "0",
+            total_volume_usdt: "0",
+            paid_fee_usdt: "0",
+            cost_usdt: "0",
+            points: "0",
+            referral_points: "0",
+            error: ""
+          });
+        }
+
+        const s = map.get(wallet);
+        if (row.status === "error") {
+          s.status = "error";
+          s.calculated_all = "";
+          s.error = row.error || "请求失败";
+          continue;
+        }
+
+        if (row.status !== "ok") {
+          if (!s.error) s.error = row.error || row.status;
+          continue;
+        }
+
+        s.rank = row.rank || s.rank;
+        s.total_points = row.total_points || s.total_points;
+        s.selected_weeks.push(String(row.week));
+
+        if (String(row.calculated).toLowerCase() !== "true") {
+          s.calculated_all = "false";
+        }
+
+        s.trade_count = decimalAdd(s.trade_count, row.trade_count || "0");
+        s.paid_volume_usdt = decimalAdd(s.paid_volume_usdt, row.paid_volume_usdt || "0");
+        s.free_volume_usdt = decimalAdd(s.free_volume_usdt, row.free_volume_usdt || "0");
+        s.total_volume_usdt = decimalAdd(s.total_volume_usdt, row.total_volume_usdt || "0");
+        s.paid_fee_usdt = decimalAdd(s.paid_fee_usdt, row.paid_fee_usdt || "0");
+        s.cost_usdt = decimalAdd(s.cost_usdt, row.cost_usdt || "0");
+        s.points = decimalAdd(s.points, row.points || "0");
+        s.referral_points = decimalAdd(s.referral_points, row.referral_points || "0");
+      }
+
+      return [...map.values()].map(row => ({
+        ...row,
+        selected_weeks: row.selected_weeks.join(",")
+      }));
+    }
+
+    function updateStats() {
+      $("statProgress").textContent = `${state.completedWallets} / ${state.totalWallets}`;
+      $("statOkFail").textContent = `${state.successWallets} / ${state.failedWallets}`;
+
+      const okRows = state.detailRows.filter(r => r.status === "ok");
+      const totalVolume = decimalSum(okRows.map(r => r.total_volume_usdt));
+      const totalCost = decimalSum(okRows.map(r => r.cost_usdt));
+      const totalTrades = decimalSum(okRows.map(r => r.trade_count));
+      const totalPoints = decimalSum(okRows.map(r => r.points));
+      const calculated = okRows.filter(r => r.calculated === "true").length;
+      const uncalculated = okRows.filter(r => r.calculated === "false").length;
+
+      $("statVolume").textContent = shortDecimal(totalVolume, 4);
+      $("statCost").textContent = shortDecimal(totalCost, 8);
+      $("statTrades").textContent = totalTrades;
+      $("statPoints").textContent = shortDecimal(totalPoints, 6);
+      $("statCalculated").textContent = String(calculated);
+      $("statUncalculated").textContent = String(uncalculated);
+
+      const pct = state.totalWallets ? Math.round(state.completedWallets / state.totalWallets * 100) : 0;
+      $("progressBar").style.width = `${pct}%`;
+
+      const hasRows = state.detailRows.length > 0;
+      $("exportSummaryBtn").disabled = !hasRows;
+      $("exportDetailBtn").disabled = !hasRows;
+      $("copySummaryBtn").disabled = !hasRows;
+    }
+
+    function cellClass(key, value) {
+      if (key === "status") {
+        if (value === "ok") return "ok";
+        if (value === "error") return "badText";
+        return "warnText";
+      }
+      if (key === "calculated" || key === "calculated_all") {
+        if (value === "true") return "ok";
+        if (value === "false") return "warnText";
+      }
+      if (key === "wallet") return "wallet";
+      return "";
+    }
+
+    function renderTable(containerId, rows, columns) {
+      const box = $(containerId);
+      if (!rows.length) {
+        box.innerHTML = `<div style="padding:18px;color:var(--muted)">暂无数据</div>`;
+        return;
+      }
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const trh = document.createElement("tr");
+
+      for (const [, label] of columns) {
+        const th = document.createElement("th");
+        th.textContent = label;
+        trh.appendChild(th);
+      }
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const [key] of columns) {
+          const td = document.createElement("td");
+          const value = row[key] ?? "";
+          td.textContent = value;
+          td.title = value;
+          const cls = cellClass(key, value);
+          if (cls) td.className = cls;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+
+      box.innerHTML = "";
+      box.appendChild(table);
+    }
+
+    function renderAll() {
+      state.summaryRows = buildSummaryRows(state.detailRows);
+      renderTable("summaryBox", state.summaryRows, summaryColumns);
+      renderTable("detailBox", state.detailRows, detailColumns);
+      updateStats();
+    }
+
+    async function runQuery() {
+      if (state.running) return;
+
+      const wallets = extractWallets($("wallets").value);
+      if (!wallets.length) {
+        alert("没有识别到有效钱包地址");
+        return;
+      }
+
+      let selectedWeeks = null;
+      try {
+        selectedWeeks = parseWeeks($("weeks").value);
+      } catch (err) {
+        alert(err.message || String(err));
+        return;
+      }
+
+      let concurrency = Math.max(1, Math.min(50, Number($("concurrency").value || 5)));
+      concurrency = Math.min(concurrency, wallets.length);
+
+      state.abort = false;
+      state.running = true;
+      state.totalWallets = wallets.length;
+      state.completedWallets = 0;
+      state.successWallets = 0;
+      state.failedWallets = 0;
+      state.detailRows = [];
+      state.summaryRows = [];
+      state.startedAt = Date.now();
+
+      $("startBtn").disabled = true;
+      $("stopBtn").disabled = false;
+      setLog(`开始查询：${wallets.length} 个钱包，并发 ${concurrency}，周数：${selectedWeeks === null ? "全部周" : selectedWeeks.join(",")}`);
+      renderAll();
+
+      let cursor = 0;
+
+      async function worker(workerId) {
+        while (!state.abort) {
+          const idx = cursor++;
+          if (idx >= wallets.length) break;
+
+          const wallet = wallets[idx];
+          try {
+            log(`查询中 ${idx + 1}/${wallets.length}: ${wallet}`);
+            const data = await fetchWallet(wallet);
+            const rows = buildRows(wallet, data, selectedWeeks);
+            state.detailRows.push(...rows);
+            state.successWallets += 1;
+            log(`完成 ${idx + 1}/${wallets.length}: ${wallet}`);
+          } catch (err) {
+            const message = err && err.message ? err.message : String(err);
+            state.detailRows.push(buildErrorDetailRow(wallet, message));
+            state.failedWallets += 1;
+            log(`失败 ${idx + 1}/${wallets.length}: ${wallet} | ${message}`);
+          } finally {
+            state.completedWallets += 1;
+            renderAll();
+          }
+        }
+      }
+
+      try {
+        await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i + 1)));
+      } finally {
+        state.running = false;
+        $("startBtn").disabled = false;
+        $("stopBtn").disabled = true;
+        const seconds = ((Date.now() - state.startedAt) / 1000).toFixed(1);
+        log(state.abort ? `已停止，用时 ${seconds}s` : `全部完成，用时 ${seconds}s`);
+        renderAll();
+      }
+    }
+
+    function clearResults() {
+      state.abort = false;
+      state.running = false;
+      state.totalWallets = 0;
+      state.completedWallets = 0;
+      state.successWallets = 0;
+      state.failedWallets = 0;
+      state.detailRows = [];
+      state.summaryRows = [];
+      $("progressBar").style.width = "0%";
+      setLog("已清空结果。等待开始...");
+      renderAll();
+    }
+
+    function csvEscape(value) {
+      const s = String(value ?? "");
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function downloadCsv(filename, rows, columns) {
+      if (!rows.length) return;
+      const header = columns.map(([, label]) => csvEscape(label)).join(",");
+      const lines = rows.map(row => columns.map(([key]) => csvEscape(row[key])).join(","));
+      const csv = "\ufeff" + [header, ...lines].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copySummary() {
+      if (!state.summaryRows.length) return;
+      const header = summaryColumns.map(([, label]) => label).join("\t");
+      const lines = state.summaryRows.map(row => summaryColumns.map(([key]) => row[key] ?? "").join("\t"));
+      const text = [header, ...lines].join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        log("已复制汇总表，可直接粘贴到 Excel/Google Sheets。 ");
+      } catch (err) {
+        alert("复制失败，浏览器可能不允许剪贴板权限。可以改用导出 CSV。");
+      }
+    }
+
+    function fillSample() {
+      $("wallets").value = [
+        "0x6dcf1f5b09dfbe711fe7278c072eecac55a8e327",
+        "0x1111111111111111111111111111111111111111",
+        "0x2222222222222222222222222222222222222222"
+      ].join("\n");
+      $("weeks").value = "17,18";
+      setLog("已填入示例。把示例钱包替换成你自己的即可。 ");
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const name = tab.dataset.tab;
+        $("summaryBox").style.display = name === "summary" ? "block" : "none";
+        $("detailBox").style.display = name === "detail" ? "block" : "none";
+      });
+    });
+
+    $("startBtn").addEventListener("click", runQuery);
+    $("stopBtn").addEventListener("click", () => { state.abort = true; log("正在停止，已发出的请求会等待返回..."); });
+    $("clearBtn").addEventListener("click", clearResults);
+    $("sampleBtn").addEventListener("click", fillSample);
+    $("exportSummaryBtn").addEventListener("click", () => downloadCsv("opinx_summary.csv", state.summaryRows, summaryColumns));
+    $("exportDetailBtn").addEventListener("click", () => downloadCsv("opinx_detail.csv", state.detailRows, detailColumns));
+    $("copySummaryBtn").addEventListener("click", copySummary);
+
+    renderAll();
+  </script>
+</body>
+</html>
