@@ -3,237 +3,246 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OPINX Predict 积分批量查询</title>
+  <title>OPINX Predict 积分批量查询（含周明细与汇总统计）</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #111936;
-      --panel2: #0f1730;
-      --text: #e9eefc;
-      --muted: #9eacc9;
-      --line: #24304f;
-      --accent: #7aa2ff;
-      --ok: #66d39e;
-      --warn: #ffd166;
-      --bad: #ff7b7b;
-      --shadow: 0 18px 50px rgba(0,0,0,.28);
+      --bg: #f5f4ef;
+      --panel: #ffffff;
+      --text: #1f2330;
+      --muted: #6a7282;
+      --line: #e3e1d9;
+      --line-strong: #cfccc2;
+      --accent: #1d63ed;
+      --accent-hover: #174fc2;
+      --ok: #147a3d;
+      --warn: #8a6200;
+      --bad: #b8342a;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      background: radial-gradient(circle at top left, #17234a 0, var(--bg) 34%, #070a13 100%);
+      background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "Microsoft YaHei", sans-serif;
-      line-height: 1.45;
+      line-height: 1.5;
+      font-size: 14px;
     }
 
     .wrap {
-      max-width: 1380px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 28px 18px 44px;
+      padding: 22px 26px 40px;
     }
 
     h1 {
-      margin: 0 0 8px;
-      font-size: 28px;
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 800;
       letter-spacing: .2px;
     }
 
     .subtitle {
       color: var(--muted);
-      margin-bottom: 22px;
+      margin-bottom: 14px;
+      font-size: 13px;
     }
-
-    .grid {
-      display: grid;
-      grid-template-columns: minmax(320px, 430px) 1fr;
-      gap: 18px;
-      align-items: start;
-    }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-
-    .card .hd {
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.025);
-      font-weight: 700;
-    }
-
-    .card .bd { padding: 18px; }
 
     label {
-      display: block;
-      margin: 0 0 7px;
-      color: #dbe5ff;
-      font-size: 13px;
-      font-weight: 650;
-    }
-
-    textarea, input, select {
-      width: 100%;
+      display: inline-block;
+      margin: 0 6px 0 0;
       color: var(--text);
-      background: rgba(4, 8, 20, .78);
-      border: 1px solid #2c395d;
-      border-radius: 12px;
-      padding: 11px 12px;
-      outline: none;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 600;
     }
 
-    textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+    textarea, input[type="text"], input[type="number"], input[type="search"], select {
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      padding: 6px 9px;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    textarea:focus, input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(29, 99, 237, .12);
+    }
 
     textarea {
-      min-height: 240px;
+      width: 100%;
+      min-height: 160px;
       resize: vertical;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.7;
     }
 
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 14px;
+    .field-block { margin-top: 10px; }
+    .field-block input[type="text"] { width: 100%; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0 10px;
     }
 
-    .field { margin-top: 14px; }
+    .control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-group input[type="number"],
+    .control-group input[type="text"] {
+      width: 72px;
+    }
+
+    .control-group input.wide { width: 150px; }
 
     .help {
-      margin-top: 7px;
       color: var(--muted);
       font-size: 12px;
-    }
-
-    .buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 16px;
+      margin-top: 4px;
     }
 
     button {
-      border: 0;
+      border: 1px solid var(--accent);
       cursor: pointer;
-      border-radius: 12px;
-      padding: 11px 14px;
-      color: #091124;
+      border-radius: 4px;
+      padding: 6px 16px;
+      color: #fff;
       background: var(--accent);
-      font-weight: 750;
-      font-size: 14px;
+      font-weight: 600;
+      font-size: 13px;
+      font-family: inherit;
     }
 
+    button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
     button.secondary {
-      background: #263452;
+      background: var(--panel);
       color: var(--text);
-      border: 1px solid #34446a;
+      border: 1px solid var(--line-strong);
+    }
+
+    button.secondary:hover {
+      background: #efede6;
+      border-color: var(--line-strong);
     }
 
     button.warn {
-      background: var(--warn);
-      color: #201705;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line-strong);
     }
+
+    button.warn:hover { background: #efede6; }
 
     button.bad {
-      background: #56303a;
-      color: #ffdce3;
-      border: 1px solid #77424f;
+      background: var(--panel);
+      color: var(--bad);
+      border: 1px solid var(--line-strong);
     }
 
+    button.bad:hover { background: #f8ecea; border-color: var(--bad); }
+
     button:disabled {
-      opacity: .55;
+      opacity: .5;
       cursor: not-allowed;
     }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(135px, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
+    .checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      user-select: none;
     }
 
-    .stat {
-      background: rgba(6, 12, 28, .72);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
+    .checkbox input { accent-color: var(--accent); }
+
+    .progress-line {
+      margin: 10px 0;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.9;
     }
 
-    .stat .k {
-      color: var(--muted);
-      font-size: 11px;
-      margin-bottom: 4px;
+    .progress-line .label {
+      font-weight: 700;
+      margin-right: 4px;
     }
 
-    .stat .v {
-      font-size: 18px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
-      letter-spacing: .2px;
+    .progress-line .sep {
+      color: var(--line-strong);
+      margin: 0 10px;
+    }
+
+    .progress-line .num-list {
+      color: var(--text);
     }
 
     .progressOuter {
-      height: 12px;
-      border-radius: 999px;
+      height: 4px;
       overflow: hidden;
-      background: rgba(255,255,255,.08);
-      margin-bottom: 14px;
-      border: 1px solid rgba(255,255,255,.08);
+      background: var(--line);
+      margin: 6px 0 10px;
+      border-radius: 2px;
     }
 
     .progressInner {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, var(--accent), #9ef0c6);
+      background: var(--accent);
       transition: width .2s ease;
     }
 
     .tabs {
       display: flex;
-      gap: 8px;
-      margin: 16px 0 12px;
-      flex-wrap: wrap;
+      gap: 0;
+      margin: 14px 0 0;
+      border-bottom: 1px solid var(--line);
     }
 
     .tab {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid var(--line);
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
       color: var(--muted);
       cursor: pointer;
-      font-weight: 700;
+      font-weight: 600;
       font-size: 13px;
+      margin-bottom: -1px;
     }
 
+    .tab:hover { color: var(--text); }
+
     .tab.active {
-      color: #061025;
-      background: var(--accent);
-      border-color: var(--accent);
+      color: var(--accent);
+      border-bottom-color: var(--accent);
     }
 
     .tools {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 12px;
+      margin: 10px 0;
     }
 
-    .tools button { width: auto; }
-
     .tableWrap {
-      max-height: 560px;
+      max-height: 680px;
       overflow: auto;
       border: 1px solid var(--line);
-      border-radius: 14px;
-      background: rgba(4,8,20,.48);
+      background: var(--panel);
     }
 
     table {
@@ -244,20 +253,29 @@
     }
 
     th, td {
-      padding: 10px 11px;
-      border-bottom: 1px solid rgba(255,255,255,.07);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
       text-align: left;
       white-space: nowrap;
-      vertical-align: top;
+      vertical-align: middle;
     }
 
     th {
       position: sticky;
       top: 0;
       z-index: 1;
-      background: #111936;
-      color: #dce6ff;
+      background: #fafaf7;
+      color: var(--text);
       font-size: 12px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--line-strong);
+    }
+
+    td:first-child, th:first-child {
+      color: var(--muted);
+      font-weight: 600;
+      width: 44px;
+      padding-right: 6px;
     }
 
     td.wallet {
@@ -270,20 +288,20 @@
       gap: 8px;
     }
 
-    td.wallet code {
-      background: rgba(255,255,255,.05);
-      padding: 2px 7px;
-      border-radius: 6px;
-      font-size: 12px;
-      border: 1px solid rgba(255,255,255,.06);
+    td.wallet a.walletLink {
+      color: var(--accent);
+      text-decoration: underline;
+      font-size: 13px;
     }
+
+    td.wallet a.walletLink:hover { color: var(--accent-hover); }
 
     td.wallet .copyBtn {
       background: transparent;
       color: var(--muted);
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 6px;
-      padding: 2px 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      padding: 1px 6px;
       font-size: 11px;
       cursor: pointer;
       font-weight: 600;
@@ -310,20 +328,20 @@
 
     th.sortable.activeSort .arrow { color: var(--accent); }
 
-    tbody tr:hover { background: rgba(122, 162, 255, .05); }
+    tbody tr:hover { background: #fafaf5; }
 
     .tableBar {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 10px;
+      margin: 10px 0 8px;
       flex-wrap: wrap;
     }
 
     .tableBar input[type="search"] {
       flex: 1;
       min-width: 220px;
-      padding: 8px 11px;
+      padding: 6px 10px;
       font-size: 13px;
     }
 
@@ -332,156 +350,153 @@
       font-size: 12px;
     }
 
-    .ok { color: var(--ok); font-weight: 700; }
-    .badText { color: var(--bad); font-weight: 700; }
-    .warnText { color: var(--warn); font-weight: 700; }
+    .ok { color: var(--ok); font-weight: 600; }
+    .badText { color: var(--bad); font-weight: 600; }
+    .warnText { color: var(--warn); font-weight: 600; }
     .muted { color: var(--muted); }
 
     .log {
-      margin-top: 14px;
-      height: 130px;
+      margin-top: 10px;
+      max-height: 120px;
       overflow: auto;
-      border-radius: 12px;
       border: 1px solid var(--line);
-      background: rgba(2,6,16,.78);
-      padding: 10px 12px;
-      color: #b8c5e4;
+      background: var(--panel);
+      padding: 8px 10px;
+      color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       font-size: 12px;
       white-space: pre-wrap;
+      border-radius: 3px;
     }
 
     .note {
-      margin-top: 14px;
-      padding: 12px;
-      border-radius: 13px;
-      border: 1px solid rgba(255, 209, 102, .24);
-      background: rgba(255, 209, 102, .08);
-      color: #ffe6a6;
-      font-size: 13px;
+      margin: 10px 0;
+      padding: 10px 12px;
+      border-left: 3px solid var(--warn);
+      background: #fdf6e3;
+      color: #5c4600;
+      font-size: 12px;
     }
 
-    @media (max-width: 980px) {
-      .grid { grid-template-columns: 1fr; }
-      .stats { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
-      .row { grid-template-columns: 1fr; }
+    details.advanced {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 3px;
     }
+
+    details.advanced > summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+      user-select: none;
+    }
+
+    details.advanced[open] > summary { margin-bottom: 10px; }
+
+    details.advanced .row-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    details.advanced .row-grid input { width: 100%; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>OPINX Predict 积分批量查询</h1>
-    <div class="subtitle">批量查询指定钱包的指定周数，统计交易量、手续费成本、交易次数和积分。总交易量 = paid_volume_usdt + free_volume_usdt；手续费 = paid_fee_usdt × 手续费折扣；积分 = points × 积分倍率（与网站展示口径一致）。</div>
+    <h1>OPINX Predict 积分批量查询（含周明细与汇总统计）</h1>
+    <div class="subtitle">将多个地址按行粘贴，每行一个地址</div>
 
-    <div class="grid">
-      <section class="card">
-        <div class="hd">查询配置</div>
-        <div class="bd">
-          <label for="wallets">钱包地址</label>
-          <textarea id="wallets" placeholder="一行一个钱包，或者直接粘贴一堆文本，页面会自动提取 0x 钱包地址">0x6dcf1f5b09dfbe711fe7278c072eecac55a8e327</textarea>
-          <div class="help">支持自动去重。格式必须是 0x + 40 位十六进制字符。</div>
+    <textarea id="wallets" placeholder="一行一个钱包，或者直接粘贴一堆文本，页面会自动提取 0x 钱包地址">0x6dcf1f5b09dfbe711fe7278c072eecac55a8e327</textarea>
 
-          <div class="row">
-            <div>
-              <label for="weeks">指定周数</label>
-              <input id="weeks" value="18" placeholder="例如：18 或 17,18 或 1-18；留空=全部周" />
-              <div class="help">支持：18、17,18、1-18、1-3,17,18</div>
-            </div>
-            <div>
-              <label for="concurrency">并发数量</label>
-              <input id="concurrency" type="number" min="1" max="50" value="5" />
-              <div class="help">建议 3-10，太高可能被限流。</div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label for="retries">失败重试</label>
-              <input id="retries" type="number" min="0" max="10" value="3" />
-            </div>
-            <div>
-              <label for="timeoutMs">超时毫秒</label>
-              <input id="timeoutMs" type="number" min="3000" step="1000" value="20000" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label for="pointsMultiplier">积分倍率</label>
-              <input id="pointsMultiplier" type="number" min="0" step="0.01" value="1.1" />
-              <div class="help">网站展示是 API 原值 ×1.1</div>
-            </div>
-            <div>
-              <label for="feeMultiplier">手续费折扣</label>
-              <input id="feeMultiplier" type="number" min="0" step="0.01" value="0.9" />
-              <div class="help">网站展示是 API 原值 ×0.9</div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="apiTemplate">API 模板</label>
-            <input id="apiTemplate" value="https://tool.opinx.app/api/predict/points/{wallet}" />
-            <div class="help">必须包含 {wallet} 占位符。</div>
-          </div>
-
-          <div class="field">
-            <label for="proxyPrefix">代理前缀，可选</label>
-            <input id="proxyPrefix" placeholder="正常留空。如果浏览器报 CORS，可填你自己的代理前缀，例如 https://你的域名/proxy?url=" />
-            <div class="help">留空为直连。填写后会请求：代理前缀 + encodeURIComponent(真实 API URL)。</div>
-          </div>
-
-          <div class="buttons">
-            <button id="startBtn">开始查询</button>
-            <button id="stopBtn" class="bad" disabled>停止</button>
-            <button id="clearBtn" class="secondary">清空结果</button>
-            <button id="sampleBtn" class="secondary">填入示例</button>
-          </div>
-
-          <div class="note">
-            如果打开页面后请求失败并提示 <b>Failed to fetch</b> 或 <b>CORS</b>，说明接口没有允许浏览器跨域读取。单 HTML 页面无法绕过浏览器限制，需要你用自己的后端/Nginx/Cloudflare Worker 做一个转发代理。
-          </div>
-
-          <div id="log" class="log">等待开始...</div>
-        </div>
-      </section>
-
-      <main class="card">
-        <div class="hd">查询结果</div>
-        <div class="bd">
-          <div class="stats">
-            <div class="stat"><div class="k">钱包数量 / 已完成</div><div class="v" id="statProgress">0 / 0</div></div>
-            <div class="stat"><div class="k">成功 / 失败</div><div class="v" id="statOkFail">0 / 0</div></div>
-            <div class="stat"><div class="k">汇总交易量 USDT</div><div class="v" id="statVolume">0</div></div>
-            <div class="stat"><div class="k">汇总成本 USDT</div><div class="v" id="statCost">0</div></div>
-            <div class="stat"><div class="k">汇总交易次数</div><div class="v" id="statTrades">0</div></div>
-            <div class="stat"><div class="k">汇总积分</div><div class="v" id="statPoints">0</div></div>
-            <div class="stat"><div class="k">已结算明细行</div><div class="v" id="statCalculated">0</div></div>
-            <div class="stat"><div class="k">未结算明细行</div><div class="v" id="statUncalculated">0</div></div>
-          </div>
-
-          <div class="progressOuter"><div id="progressBar" class="progressInner"></div></div>
-
-          <div class="tools">
-            <button id="exportSummaryBtn" class="warn" disabled>导出汇总 CSV</button>
-            <button id="exportDetailBtn" class="warn" disabled>导出明细 CSV</button>
-            <button id="copySummaryBtn" class="secondary" disabled>复制汇总表</button>
-          </div>
-
-          <div class="tabs">
-            <div class="tab active" data-tab="summary">钱包汇总</div>
-            <div class="tab" data-tab="detail">周明细</div>
-          </div>
-
-          <div class="tableBar">
-            <input id="filterInput" type="search" placeholder="按钱包、状态、错误信息、周数过滤..." />
-            <div class="rowCount" id="rowCount">0 行</div>
-          </div>
-
-          <div id="summaryBox" class="tableWrap"></div>
-          <div id="detailBox" class="tableWrap" style="display:none"></div>
-        </div>
-      </main>
+    <div class="controls">
+      <div class="control-group">
+        <label for="weeks">周数</label>
+        <input id="weeks" type="text" value="18" placeholder="18 / 17,18 / 1-18" />
+      </div>
+      <button id="startBtn">开始查询</button>
+      <button id="clearBtn" class="secondary">清空结果</button>
+      <button id="stopBtn" class="bad" disabled>停止</button>
+      <label class="checkbox"><input id="onlyCalculated" type="checkbox" />只显示已结算的周</label>
     </div>
+
+    <div class="progress-line">
+      <span class="label">进度：</span><span id="statProgress">0 / 0</span>
+      <span class="sep">|</span>
+      <span class="label">成功</span><span id="statSuccess">0</span>
+      <span class="sep">|</span>
+      <span class="label">汇总积分 Σ:</span><span id="statPoints">0</span>
+      <span class="sep">|</span>
+      <span class="label">汇总交易量</span><span id="statVolume">0</span>
+      <span class="sep">|</span>
+      <span class="label">汇总成本</span><span id="statCost">0</span>
+      <span class="sep">|</span>
+      <span class="label">交易次数</span><span id="statTrades">0</span>
+      <span class="sep">|</span>
+      <span class="label">已结算 / 未结算</span><span id="statCalcSplit">0 / 0</span>
+    </div>
+
+    <div class="progressOuter"><div id="progressBar" class="progressInner"></div></div>
+
+    <details class="advanced">
+      <summary>高级配置（API、代理、并发、倍率）</summary>
+      <div class="row-grid">
+        <div>
+          <label for="concurrency">并发数量</label>
+          <input id="concurrency" type="number" min="1" max="50" value="5" />
+          <div class="help">建议 3-10。</div>
+        </div>
+        <div>
+          <label for="retries">失败重试</label>
+          <input id="retries" type="number" min="0" max="10" value="3" />
+        </div>
+        <div>
+          <label for="timeoutMs">超时毫秒</label>
+          <input id="timeoutMs" type="number" min="3000" step="1000" value="20000" />
+        </div>
+        <div>
+          <label for="pointsMultiplier">积分倍率</label>
+          <input id="pointsMultiplier" type="number" min="0" step="0.01" value="1.1" />
+        </div>
+        <div>
+          <label for="feeMultiplier">手续费折扣</label>
+          <input id="feeMultiplier" type="number" min="0" step="0.01" value="0.9" />
+        </div>
+        <div>
+          <label for="apiTemplate">API 模板</label>
+          <input id="apiTemplate" type="text" value="https://tool.opinx.app/api/predict/points/{wallet}" />
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <label for="proxyPrefix">代理前缀（可选）</label>
+          <input id="proxyPrefix" type="text" placeholder="留空即直连。如有 CORS 问题填代理前缀，例如 https://你的域名/proxy?url=" />
+        </div>
+      </div>
+      <div class="note">
+        如果请求失败提示 <b>Failed to fetch</b> 或 <b>CORS</b>，需要你自己的后端/Nginx/Cloudflare Worker 做转发代理。
+      </div>
+    </details>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="summary">钱包汇总</div>
+      <div class="tab" data-tab="detail">周明细</div>
+    </div>
+
+    <div class="tableBar">
+      <input id="filterInput" type="search" placeholder="按钱包、状态、错误信息、周数过滤..." />
+      <div class="rowCount" id="rowCount">0 行</div>
+      <button id="sampleBtn" class="secondary">填入示例</button>
+      <button id="copySummaryBtn" class="secondary" disabled>复制汇总表</button>
+      <button id="exportSummaryBtn" class="warn" disabled>导出汇总 CSV</button>
+      <button id="exportDetailBtn" class="warn" disabled>导出明细 CSV</button>
+    </div>
+
+    <div id="summaryBox" class="tableWrap"></div>
+    <div id="detailBox" class="tableWrap" style="display:none"></div>
+
+    <div id="log" class="log">等待开始...</div>
   </div>
 
   <script>
@@ -499,6 +514,7 @@
       startedAt: null,
       activeTab: "summary",
       filterText: "",
+      onlyCalculated: false,
       sort: {
         summary: { key: null, dir: "asc" },
         detail: { key: null, dir: "asc" },
@@ -934,7 +950,7 @@
 
     function updateStats() {
       $("statProgress").textContent = `${state.completedWallets} / ${state.totalWallets}`;
-      $("statOkFail").textContent = `${state.successWallets} / ${state.failedWallets}`;
+      $("statSuccess").textContent = `${state.successWallets} / ${state.failedWallets}`;
 
       const okRows = state.detailRows.filter(r => r.status === "ok");
       const totalVolume = decimalSum(okRows.map(r => r.total_volume_usdt));
@@ -948,8 +964,7 @@
       $("statCost").textContent = shortDecimal(totalCost, 8);
       $("statTrades").textContent = totalTrades;
       $("statPoints").textContent = shortDecimal(totalPoints, 6);
-      $("statCalculated").textContent = String(calculated);
-      $("statUncalculated").textContent = String(uncalculated);
+      $("statCalcSplit").textContent = `${calculated} / ${uncalculated}`;
 
       const pct = state.totalWallets ? Math.round(state.completedWallets / state.totalWallets * 100) : 0;
       $("progressBar").style.width = `${pct}%`;
@@ -974,10 +989,18 @@
       return "";
     }
 
-    function filterRows(rows) {
+    function filterRows(rows, tableKey) {
+      let result = rows;
+      if (state.onlyCalculated) {
+        if (tableKey === "detail") {
+          result = result.filter(r => String(r.calculated).toLowerCase() === "true");
+        } else if (tableKey === "summary") {
+          result = result.filter(r => String(r.calculated_all).toLowerCase() === "true");
+        }
+      }
       const q = state.filterText.trim().toLowerCase();
-      if (!q) return rows;
-      return rows.filter(row => {
+      if (!q) return result;
+      return result.filter(row => {
         for (const key in row) {
           const v = row[key];
           if (v === null || v === undefined) continue;
@@ -1013,21 +1036,28 @@
         td.title = value;
         const wrap = document.createElement("span");
         wrap.className = "walletInner";
-        const code = document.createElement("code");
-        code.textContent = shortWallet(value);
+        const link = document.createElement("a");
+        link.className = "walletLink";
+        link.textContent = value;
+        try {
+          link.href = makeUrl(value);
+        } catch { link.href = "#"; }
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
         const btn = document.createElement("button");
         btn.className = "copyBtn";
         btn.type = "button";
         btn.textContent = "复制";
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
+          e.preventDefault();
           try {
             await navigator.clipboard.writeText(value);
             btn.textContent = "已复制";
             setTimeout(() => { btn.textContent = "复制"; }, 1200);
           } catch { btn.textContent = "失败"; }
         });
-        wrap.append(code, btn);
+        wrap.append(link, btn);
         td.appendChild(wrap);
         return;
       }
@@ -1037,7 +1067,7 @@
 
     function renderTable(containerId, rows, columns, tableKey) {
       const box = $(containerId);
-      const filtered = filterRows(rows);
+      const filtered = filterRows(rows, tableKey);
       const sorted = sortRows(filtered, state.sort[tableKey]);
 
       if (state.activeTab === tableKey) {
@@ -1053,6 +1083,10 @@
       const thead = document.createElement("thead");
       const trh = document.createElement("tr");
       const sortState = state.sort[tableKey];
+
+      const indexTh = document.createElement("th");
+      indexTh.textContent = "#";
+      trh.appendChild(indexTh);
 
       for (const [key, label] of columns) {
         const th = document.createElement("th");
@@ -1080,8 +1114,11 @@
       table.appendChild(thead);
 
       const tbody = document.createElement("tbody");
-      for (const row of sorted) {
+      sorted.forEach((row, idx) => {
         const tr = document.createElement("tr");
+        const indexTd = document.createElement("td");
+        indexTd.textContent = String(idx + 1);
+        tr.appendChild(indexTd);
         for (const [key] of columns) {
           const td = document.createElement("td");
           const value = row[key] ?? "";
@@ -1091,7 +1128,7 @@
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
-      }
+      });
       table.appendChild(tbody);
 
       box.innerHTML = "";
@@ -1252,6 +1289,11 @@
 
     $("filterInput").addEventListener("input", (e) => {
       state.filterText = e.target.value || "";
+      renderAll();
+    });
+
+    $("onlyCalculated").addEventListener("change", (e) => {
+      state.onlyCalculated = e.target.checked;
       renderAll();
     });
 
